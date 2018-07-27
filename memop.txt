@@ -1,0 +1,124 @@
+From0601To0630
+100
+28*10
+predict money: 1182150
+Accuracy over 0.56: 0.562059620596206
+
+300
+
+28*10
+trade accuracy: 0.5277088502894954
+trade money: 1040100
+predict money: 1257300
+Accuracy over 0.55: 0.5472954969357847
+
+trade accuracy: 0.5763723150357996
+trade money: 1108850
+predict money: 1262200
+Accuracy over 0.56: 0.586015538290788
+
+trade accuracy: 0.5941043083900227
+trade money: 1074900
+predict money: 1141850
+Accuracy over 0.57: 0.5922989807474519
+
+trade accuracy: 0.6086956521739131
+trade money: 1048000
+predict money: 1080000
+Accuracy over 0.58: 0.5944798301486199
+
+28*15
+trade accuracy: 0.5247766043866775
+trade money: 1033700
+predict money: 1271700
+Accuracy over 0.55: 0.5480794019077082
+
+trade accuracy: 0.552423900789177
+trade money: 1073500
+predict money: 1275700
+Accuracy over 0.56: 0.584935064935065
+
+trade accuracy: 0.5876288659793815
+trade money: 1075750
+predict money: 1155400
+Accuracy over 0.57: 0.5927461139896373
+
+trade accuracy: 0.592741935483871
+trade money: 1043650
+predict money: 1071600
+Accuracy over 0.58: 0.5818181818181818
+
+40*15
+trade accuracy: 0.5626016260162602
+trade money: 1064700
+predict money: 1203700
+Accuracy over 0.56: 0.5812080536912752
+
+40*30
+trade accuracy: 0.5435294117647059
+trade money: 1055900
+predict money: 1224550
+Accuracy over 0.56: 0.5610801543077583
+
+trade accuracy: 0.576271186440678
+trade money: 1063400
+predict money: 1195150
+Accuracy over 0.57: 0.5962360992301112
+
+
+From0515To0622
+100
+28*10
+predict money: 1583750
+Accuracy over 0.54: 0.5376569037656904
+
+predict money: 1545400
+Accuracy over 0.55: 0.5612441027433165
+
+predict money: 1354000
+Accuracy over 0.56: 0.5723793677204659
+
+predict money: 1239850
+Accuracy over 0.57: 0.5861229458307973
+
+40*20
+predict money: 1425100
+Accuracy over 0.55: 0.5473178542834267
+
+predict money: 1372650
+Accuracy over 0.56: 0.5690838555655028
+
+300
+12*20
+predict money: 1360000
+Accuracy over 0.54: 0.5265137269650244
+
+predict money: 1408600
+Accuracy over 0.55: 0.5491573033707865
+
+predict money: 1194700
+Accuracy over 0.56: 0.5498098859315589
+
+28*10
+predict money: 1372950
+Accuracy over 0.55: 0.5433236340122858
+
+predict money: 1393900
+Accuracy over 0.56: 0.57664
+
+predict money: 1213100
+Accuracy over 0.57: 0.5856655290102389
+
+28*15
+
+predict money: 1412050
+Accuracy over 0.56: 0.5769112680380718
+
+predict money: 1256750
+Accuracy over 0.57: 0.5939660590823381
+
+40*15
+trade accuracy: 0.5657467532467533
+trade money: 1132150
+predict money: 1315100
+Accuracy over 0.56: 0.5737265415549598

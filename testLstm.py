@@ -24,8 +24,8 @@ symbol = "GBPJPY"
 
 db_no = 3
 gpu_count = 2
-maxlen = 300
-pred_term = 3
+maxlen = 100
+pred_term = 6
 rec_num = 10000 + maxlen + pred_term + 1
 batch_size = 8192 * gpu_count
 
@@ -35,7 +35,7 @@ start_stp = int(time.mktime(start.timetuple()))
 end = datetime(2018, 3, 24)
 end_stp = int(time.mktime(end.timetuple()))
 
-s = "10"
+s = "5"
 suffix = ""
 
 except_index = False

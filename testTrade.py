@@ -21,24 +21,29 @@ from decimal import Decimal
 
 #symbol = "AUDUSD"
 symbol = "GBPJPY"
+#symbol = "EURUSD"
 
 gpu_count = 1
-maxlen = 100
+maxlen = 300
 pred_term = 6
 rec_num = 10000 + maxlen + pred_term + 1
 batch_size = 8192 * gpu_count
 
-start = datetime(2018, 5, 10)
+start = datetime(2018, 7, 26,22)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2018, 5, 11)
+end = datetime(2018, 7, 28 )
 end_stp = int(time.mktime(end.timetuple()))
 
 host = "127.0.0.1"
-db_no = 8
+db_no = 11
 s = "5"
+int_s = int(s)
+
 db_suffix = ""
-suffix = ""
+db_suffix_trade = ""
+suffix = ".28*15"
+askbid = "_bid"
 
 except_index = False
 except_highlow = True
@@ -50,7 +55,7 @@ n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
 
-border = 0.55
+border = 0.56
 payout = 950
 default_money = 1005000
 
@@ -71,7 +76,7 @@ MODEL_DIR = config['lstm']['MODEL_DIR']
 type = 'bydrop'
 
 file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop)
+                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid
 
 logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
@@ -80,7 +85,7 @@ model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5" + suffix)
 
 def get_redis_data():
     print("DB_NO:", db_no)
-    r = redis.Redis(host= host, port=6379, db=db_no)
+    r = redis.Redis(host= host, port=6379, db=db_no, decode_responses=True)
     result = r.zrangebyscore(symbol + db_suffix, start_stp, end_stp, withscores=True)
     #result = r.zrevrange(symbol, 0  , rec_num  , withscores=False)
     close_tmp, high_tmp, low_tmp = [], [], []
@@ -99,11 +104,13 @@ def get_redis_data():
     for line in result:
         body = line[0]
         score = line[1]
-        tmps = json.loads(body.decode('utf-8'))
+        tmps = json.loads(body)
+        close_t = tmps.get("close")
         close_tmp.append(tmps.get("close"))
         time_tmp.append(tmps.get("time"))
         score_tmp.append(score)
-
+        if close_t == 0.0:
+            print("close:0 " + str(score))
         #high_tmp.append(tmps.get("high"))
         #low_tmp.append(tmps.get("low"))
 
@@ -144,6 +151,14 @@ def get_redis_data():
         if except_highlow:
             if datetime.strptime(time_tmp[1 + i + maxlen -1], '%Y-%m-%d %H:%M:%S').hour in except_list:
                 continue;
+        #maxlen前の時刻までつながっていないものは除外。たとえば日付またぎなど
+        tmp_time_bef = datetime.strptime(time_tmp[1 + i], '%Y-%m-%d %H:%M:%S')
+        tmp_time_aft = datetime.strptime(time_tmp[1 + i + maxlen -1], '%Y-%m-%d %H:%M:%S')
+        delta =tmp_time_aft - tmp_time_bef
+
+        if delta.total_seconds() > ((maxlen-1) * int_s):
+            #print(tmp_time_aft)
+            continue;
         close_data.append(close[i:(i + maxlen)])
         time_data.append(time_tmp[1 + i + maxlen -1])
         price_data.append(close_tmp[1 + i + maxlen -1])
@@ -159,11 +174,11 @@ def get_redis_data():
         aft = close_tmp[1 + i + maxlen + pred_term -1]
 
         #正解をいれる
-        if float(Decimal(str(aft)) - Decimal(str(bef))) >= 0.00001 * spread:
+        if float(Decimal(str(aft)) - Decimal(str(bef))) >= 0.001 * spread:
             #上がった場合
             label_data.append([1,0,0])
             up = up + 1
-        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= 0.00001 * spread:
+        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= 0.001 * spread:
             label_data.append([0,0,1])
         else:
             label_data.append([0,1,0])
@@ -203,8 +218,7 @@ def get_model():
     if os.path.isfile(model_file):
         model = load_model(model_file)
         #model_gpu = multi_gpu_model(model, gpus=gpu_count)
-        model.compile(loss='categorical_crossentropy',
-                      optimizer='rmsprop', metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy',optimizer='rmsprop', metrics=['accuracy'])
         print("Load Model")
         return model
     else:
@@ -248,9 +262,6 @@ if __name__ == "__main__":
 
     Acc5 = np.mean(np.equal(x5.argmax(axis=1),y5.argmax(axis=1)))
     total_length = len(x5)
-    print("Accuracy over " + str(border) + ":", Acc5)
-    print("Total:", len(x5))
-    print("Correct:", len(x5) * Acc5)
 
     up = res[:, 0]
     down = res[:, 2]
@@ -323,12 +334,12 @@ if __name__ == "__main__":
     not_trade_cnt = 0
 
     r = redis.Redis(host=host, port=6379, db=db_no)
-    print("connected")
     for x,y,p,t,pt,ps,ep in zip(x5,y5,p5,t5, pt5, ps5, ep5):
 
         max = x.argmax()
         probe = str(x[max])
-        tradeReult = r.zrangebyscore(symbol + "_TRADE" + db_suffix, ps, ps)
+
+        tradeReult = r.zrangebyscore(symbol + "_TRADE" + db_suffix_trade, ps, ps)
         startVal = "NULL"
         endVal = "NULL"
         result = "NULL"
@@ -347,10 +358,17 @@ if __name__ == "__main__":
                 money_trade = money_trade - 1000
                 money_notice_try = money_notice_try - 1000
         else:
-            #NoticeMSG出た場合は1,2秒あとにトレードしている
+            #NoticeMSG出た場合は1,2,3秒あとにトレードしている
             tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +1, ps +1)
+
             if len(tradeReultNotice) == 0:
                 tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +2, ps +2)
+
+            if len(tradeReultNotice) == 0:
+                tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps + 3, ps + 3)
+
+            if len(tradeReultNotice) == 0:
+                tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps + 4, ps + 4)
 
             if len(tradeReultNotice) != 0:
                 notice_try_cnt = notice_try_cnt + 1
@@ -364,7 +382,8 @@ if __name__ == "__main__":
                 else:
                     money_notice_try = money_notice_try - 1000
             else:
-                not_trade_cnt += 1
+                if max == 0 or max == 2:
+                    not_trade_cnt += 1
             notice_cnt += 1
 
         if max == 0:
@@ -533,9 +552,11 @@ if __name__ == "__main__":
         res = txt.find("FALSE")
         if res != -1:
             print(txt)
+
     #print('\n'.join(result_txt))
-    print("trade correct: " + str(true_cnt/trade_cnt))
+
     print("trade cnt: " + str(trade_cnt))
+    print("trade correct: " + str(true_cnt / trade_cnt))
     print("trade wrong cnt: " + str(trade_cnt - true_cnt))
     print("trade wrong win cnt: " + str(trade_wrong_win_cnt))
     print("trade wrong lose cnt: " + str(trade_wrong_lose_cnt))
@@ -545,10 +566,19 @@ if __name__ == "__main__":
     print("not_notice accuracy: " + str(not_notice_win_cnt / trade_cnt))
     print("not_notice money: " + str(prev_not_notice_money))
 
+    print("notice_try accuracy: " + str((trade_win_cnt + notice_try_win_cnt) / (trade_cnt + notice_try_cnt)))
+    print("notice_try money: " + str(prev_notice_try_money))
+    print("notice_try_cnt: " + str(notice_try_cnt))
+
     print("trade accuracy: " + str(trade_win_cnt/trade_cnt))
     print("trade money: " + str(prev_trade_money))
 
     print("predict money: " + str(money))
+
+    tmp_acc = (up_cor_length + down_cor_length)/(len(up_ind5) + len(down_ind5))
+    print("Accuracy over " + str(border) + ":", tmp_acc)
+    print("Total:", len(up_ind5) + len(down_ind5))
+    print("Correct:", (len(up_ind5) + len(down_ind5)) * tmp_acc)
 
     plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
     plt.show()

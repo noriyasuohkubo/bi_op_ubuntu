@@ -26,6 +26,10 @@ import tensorflow as tf
 from keras.utils.training_utils import multi_gpu_model
 from keras.optimizers import SGD, Adadelta, Adagrad, Adam, Adamax, RMSprop, Nadam
 from logging import getLogger
+from datetime import datetime
+from datetime import timedelta
+import time
+from decimal import Decimal
 
 logger = getLogger(__name__)
 
@@ -36,26 +40,51 @@ logger = getLogger(__name__)
 #os.environ["CUDA_VISIBLE_DEVICES"] = "1"
 gpu_count = 2
 type = "category"
-symbol = "EURUSD"
-db_no = 3
-train = False
+
+#symbol = "AUDUSD"
+symbol = "GBPJPY"
+#symbol = "EURUSD"
+#symbol = "NZDJPY"
+#symbol = "USDJPY"
+
+db_no = 8
+train = True
 start_day = 120 * 24 * 300 * 0
 
-maxlen = 200
-pred_term = 3
-rec_num = 2000000 + maxlen + pred_term + 1
+maxlen = 1
+pred_term = 10
+rec_num = 10 + maxlen + pred_term + 1
+
+start = datetime(2018, 6, 1)
+start_score = int(time.mktime(start.timetuple()))
+
+end = datetime(2000, 1, 1)
+end_score = int(time.mktime(end.timetuple()))
+
 #rec_num = 3600 * 24 * 3
-epochs = 100
-batch_size = 4048 * gpu_count
-s = "10"
+epochs = 10
+batch_size = 8192 * gpu_count
+except_highlow = True
+
+except_list = [20, 21, 22]
+askbid = "_bid"
+s = "3"
+drop = 0.1
+
+in_num= 1
 np.random.seed(0)
-n_hidden =  15
+
+spread = 1
+n_hidden = 30
 n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
+
+file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
+                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop)  + askbid
 current_dir = os.path.dirname(__file__)
 ini_file = os.path.join(current_dir,"config","config.ini")
-history_file = os.path.join(current_dir,"history","history.csv")
+history_file = os.path.join(current_dir,"history", file_prefix +"_history.csv")
 
 config = configparser.ConfigParser()
 config.read(ini_file)
@@ -63,25 +92,32 @@ config.read(ini_file)
 SYMBOL_DB = json.loads(config['lstm']['SYMBOL_DB'])
 MODEL_DIR = config['lstm']['MODEL_DIR']
 
-model_file = os.path.join(MODEL_DIR, "bydrop_in1_" + s + "_m" + str(maxlen) + "_hid1_" + str(n_hidden)
-                          + "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) +".hdf5")
+model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5")
 
 
 def get_redis_data(symbol, rec_num, maxlen, pred_term, type, db_no):
     print("DB_NO:", db_no)
     r = redis.Redis(host='localhost', port=6379, db=db_no)
     start = time.time()
-    result = r.zrevrange(symbol, 0 + start_day , rec_num + start_day
-                      , withscores=False)
+    #result = r.zrevrange(symbol, 0 + start_day , rec_num + start_day , withscores=False)
+    result = r.zrevrangebyscore(symbol, start_score, end_score, start=0, num=rec_num + 1)
     #print(result)
-    close_tmp, high_tmp, low_tmp = [], [], []
+    close_tmp, high_tmp, low_tmp, time_tmp = [], [], [], []
     ask_tmp, bid_tmp = [], []
+    avol_tmp, bvol_tmp =[], []
     result.reverse()
     for line in result:
         tmps = json.loads(line.decode('utf-8'))
-        close_tmp.append(tmps.get("close"))
+
+        if askbid == "_ask":
+            close_tmp.append(tmps.get("ask"))
+        else:
+            close_tmp.append(tmps.get("close"))
+
+        time_tmp.append(tmps.get("time"))
         #high_tmp.append(tmps.get("high"))
         #low_tmp.append(tmps.get("low"))
+
         #ask_tmp.append(tmps.get("ask_volume"))
         #bid_tmp.append(tmps.get("bid_volume"))
         #print(tmps)
@@ -97,67 +133,80 @@ def get_redis_data(symbol, rec_num, maxlen, pred_term, type, db_no):
 
     #data = pd.DataFrame(tmp)
     print(close_tmp[0:10])
+    print(time_tmp[-5:])
+    print(time_tmp[0:5])
     #print((np.log(close_tmp/shift(close_tmp, 1, cval=np.NaN)))[0:10])
-    print(close[0:10])
+    ##print(close[0:10])
+    #print(high[0:10])
+    #print(low[0:10])
     #print( pd.read_json(dum, orient='records'))
 
     #tmp = preprocessing.scale(data.ix[:, "close"])
     #elapsed_time = time.time() - start
     #print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
-    close_data, high_data, low_data, label_data = [], [], [], []
+    close_data, high_data, low_data, label_data, close_tmp_data = [], [], [], [], []
     ask_data, bid_data = [], []
+    avol_data, bvol_data = [], []
+    avol_dif_data, bvol_dif_data , close_dif_data = [], [], []
 
     up =0
     same =0
     data_length = len(close) - maxlen - pred_term -1
+    #data_length = len(high) - maxlen - pred_term - 1
+
+
     for i in range(data_length):
         #close_data.append(preprocessing.scale(close[i:(i+maxlen)]))
         #high_data.append(preprocessing.scale(high[i:(i + maxlen)]))
         #low_data.append(preprocessing.scale(low[i:(i + maxlen)]))
-        """
-        c = close[i:(i + maxlen)]
-        c[0] = 1
-        h = high[i:(i + maxlen)]
-        h[0] = 1
-        l = low[i:(i + maxlen)]
-        l[0] = 1
-        close_data.append(c)
-        high_data.append(h)
-        low_data.append(l)
-        """
+        continue_flg = False
+
+        #ハイローオーストラリアの取引時間外を学習対象からはずす
+        if except_highlow:
+
+            if datetime.strptime(time_tmp[1 + i + maxlen -1], '%Y-%m-%d %H:%M:%S').hour in except_list:
+                continue;
         close_data.append(close[i:(i + maxlen)])
+        #close_tmp_data.append(close[i + maxlen -1])
         #high_data.append(high[i:(i + maxlen)])
         #low_data.append(low[i:(i + maxlen)])
+
         #ask_data.append(ask[i:(i + maxlen)])
         #bid_data.append(bid[i:(i + maxlen)])
         bef = close_tmp[1 + i + maxlen -1]
         aft = close_tmp[1 + i + maxlen + pred_term -1]
+
+        #close_dif_data.append(aft - bef)
+
         #bef = data.ix[i + maxlen, "close"]
         #aft = data.ix[i+maxlen+pred_term, "close"]
         #print("val:", bef, aft)
 
         if type=="mean":
             label_data.append([close[i + maxlen +  pred_term]])
+            #label_data.append([high[i + maxlen + pred_term]])
         elif type=="category":
-            if bef < aft:
-                #上がった場合
-                label_data.append([1,0,0])
+            if float(Decimal(str(aft)) - Decimal(str(bef))) >= 0.00001 * spread:
+                # 上がった場合
+                label_data.append([1, 0, 0])
                 up = up + 1
-            elif bef > aft:
-                label_data.append([0,0,1])
+            elif float(Decimal(str(bef)) - Decimal(str(aft))) >= 0.00001 * spread:
+                label_data.append([0, 0, 1])
             else:
-                label_data.append([0,1,0])
+                label_data.append([0, 1, 0])
                 same = same + 1
     close_np = np.array(close_data)
     #high_np = np.array(high_data)
     #low_np = np.array(low_data)
-    ask_np = np.array(ask_data)
-    bid_np = np.array(bid_data)
-    retX = np.zeros((data_length, maxlen, 1))
+    #close_dif_data_np = np.array(close_dif_data)
+
+    #close_tmp_data_np = np.array(close_tmp_data)
+    #ask_np = np.array(ask_data)
+    #bid_np = np.array(bid_data)
+
+    retX = np.zeros((len(close_np), maxlen, in_num))
     retX[:, :, 0] = close_np[:]
-    #retX[:, :, 1] = high_np[:]
-    #retX[:, :, 2] = low_np[:]
     #retX[:, :, 3] = ask_np[:]
     #retX[:, :, 4] = bid_np[:]
     #retX = np.reshape(retX, (retX.shape[0], retX.shape[1],1))
@@ -170,10 +219,26 @@ def get_redis_data(symbol, rec_num, maxlen, pred_term, type, db_no):
     print("DOWN: ", (len(retY) - up - same) / len(retY))
     #print("Y:", retY[0:30 ])
     #print("X:",retX[0][0:20])
+    """
+    close_zscore = getZscore(close_dif_data_np)
+    avol_zscore = getZscore(avol_dif_data_np)
+    bvol_zscore = getZscore(bvol_dif_data_np)
+    from scipy.stats import pearsonr
+    print("pearson avol:", pearsonr(close_zscore, avol_zscore))
+    plt.scatter(close_zscore,avol_zscore)
+    plt.show()
 
+    print("pearson bvol:", pearsonr(close_zscore, bvol_zscore))
+    plt.scatter(close_zscore,bvol_zscore)
+    plt.show()
+    """
     return retX, retY
 
-
+def getZscore(array):
+    close_mean = array.mean()
+    close_std  = np.std(array)
+    close_score = (array-close_mean)/close_std
+    return close_score
 '''
 データの生成
 '''
@@ -184,7 +249,7 @@ def get_train_data(symbol, rec_num, maxlen, pred_term, type, db_no):
     print ("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
     #データをランダム分割
-    train_X, test_X, train_Y, test_Y = train_test_split(X, Y, train_size=0.8)
+    train_X, test_X, train_Y, test_Y = train_test_split(X, Y, train_size=0.9)
     return train_X, test_X, train_Y, test_Y
 
 
@@ -212,7 +277,7 @@ def mean_pred(y_true, y_pred):
 
     return K.mean(tf.map_fn(lambda x:  tf.cond(tf.greater_equal(x[0] , z),lambda :o,lambda :z) , tmp))
 
-def create_model(n_in = 1, n_out = 3):
+def create_model(n_in = in_num, n_out = 3):
     model = None
 
     with tf.device("/cpu:0") :
@@ -224,33 +289,28 @@ def create_model(n_in = 1, n_out = 3):
                            #,return_sequences = True))
             """
             model.add(Bidirectional(LSTM(n_hidden
-                            ,kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None))
-                            #, return_sequences=True)
-                           ,input_shape=(maxlen, n_in)
+                            ,kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1.0, seed=None)
+                            )
+                            #,return_sequences=True)
+                            ,input_shape=(maxlen, n_in)
                             ))
-            model.add(Dropout(0.1))
+            model.add(Dropout(drop))
             """
-            model.add(Bidirectional(LSTM(n_hidden,kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None))
+            model.add(Bidirectional(LSTM(n_hidden2
+                                         ,kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None)
+                                         )
+                                         #, return_sequences=True)
                            ))
+            model.add(Dropout(drop))
             
-            model.add(Dropout(0.1))
-                           #,return_sequences = True))
+            model.add(Bidirectional(LSTM(n_hidden3
+                                         ,kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None))
+                           ))
+            model.add(Dropout(drop))
             
-
-            
-            model.add(LSTM(n_hidden2,
-                             kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None)))
-                             #, return_sequences = True))
-            
-            model.add(LSTM(n_hidden3,
-                           kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None)))
-                           #, return_sequences=True))
                       
-            model.add(LSTM(n_hidden4,
-                           kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None)
-                           ))
             """
-            model.add(Dense(n_out, kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1, seed=None)))
+            model.add(Dense(n_out, kernel_initializer=initializers.RandomNormal(mean=0.0, stddev=1.0, seed=None)))
             model.add(Activation('softmax'))
 
         elif type=='mean':
@@ -274,8 +334,8 @@ def get_model():
         print("Load Model")
     else:
         model = create_model()
-    #model_gpu = model
-    model_gpu = multi_gpu_model(model, gpus=gpu_count)
+    model_gpu = model
+    #model_gpu = multi_gpu_model(model, gpus=gpu_count)
     if type == "category":
         model_gpu.compile(loss='categorical_crossentropy',
                           optimizer='rmsprop', metrics=['accuracy'])
@@ -291,22 +351,6 @@ def get_model():
 モデル学習
 '''
 
-#epochs = 30
-#batch_size = 128
-
-'''
-# バッチサイズに従って訓練データの数を調整、余ったデータはテストデータに足す
-num = train_X.shape[0] - (train_X.shape[0] % batch_size)
-print("NUM:", num)
-train_x = train_X[:num,:,:]
-train_y = train_Y[:num,:]
-print("train_x.shape:", train_x.shape)
-print("train_y.shape:", train_y.shape)
-
-test_x = np.r_[train_X[num:,:,:], test_X]
-test_y = np.r_[train_Y[num:,:], test_Y]
-'''
-
 #callbacks.append(CSVLogger("history.csv"))
 # look
 # https://qiita.com/yukiB/items/f45f0f71bc9739830002
@@ -319,37 +363,27 @@ def do_train():
             MODEL_DIR,
             'lstm_{epoch:03d}_s' + s + '.hdf5'),
         save_best_only=False)
+
     train_X, test_X, train_Y, test_Y = get_train_data(symbol, rec_num, maxlen, pred_term, type, db_no)
     hist = model_gpu.fit(train_X, train_Y,
                      batch_size=batch_size,
                      epochs=epochs,
                      callbacks=[early_stopping, CSVLogger(history_file)])
 
-    '''
-    学習の進み具合を可視化
-    
-    loss = hist.history['loss']
-    plt.rc('font', family='serif')
-    fig = plt.figure()
-    plt.plot(range(len(loss)), loss, label='loss', color='black')
-    plt.xlabel('epochs')
-    plt.show()
-    #plt.savefig(__file__ + '.eps')
-    '''
     #save model, not model_gpu
     #see http://tech.wonderpla.net/entry/2018/01/09/110000
     model.save(model_file)
     print('Model saved')
 
-    do_predict(test_X, test_Y, model_gpu)
+    do_predict(test_X, test_Y, model_gpu, hist=hist)
 
-def do_predict(test_X, test_Y,model_gpu=None):
+def do_predict(test_X, test_Y,model_gpu=None,hist=None):
 
     if model_gpu is None:
         model_gpu = get_model()[1]
     total_num = len(test_Y)
 
-    res = model_gpu.predict(test_X, verbose=0)
+    res = model_gpu.predict(test_X, verbose=0, batch_size=batch_size)
     print("Predict finished")
 
     Acc = np.mean(np.equal(res.argmax(axis=1),test_Y.argmax(axis=1)))
@@ -394,7 +428,7 @@ def do_predict(test_X, test_Y,model_gpu=None):
     print("Accuracy over 0.6:", Acc6)
     print("Total:", len(x6))
     print("Correct:", len(x6) * Acc6)
-
+    """
     ind7 = np.where(res >=0.7)[0]
     x7 = res[ind7,:]
     y7= test_Y[ind7,:]
@@ -403,7 +437,7 @@ def do_predict(test_X, test_Y,model_gpu=None):
     print("Total:", len(x7))
     print("Correct:", len(x7) * Acc7)
 
-    """
+  
     ind8 = np.where(res >=0.8)[0]
     x8 = res[ind8,:]
     y8= test_Y[ind8,:]
@@ -420,6 +454,12 @@ def do_predict(test_X, test_Y,model_gpu=None):
     print("Total:", len(x9))
     print("Correct:", len(x9) * Acc9)
     """
+    if hist is not None:
+        # 損失の履歴をプロット
+        plt.plot(hist.history['loss'])
+        plt.title('model loss')
+        plt.show()
+
     K.clear_session()
 
     print("END")

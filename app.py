@@ -10,6 +10,7 @@ import json
 from scipy.ndimage.interpolation import shift
 import logging.config
 from keras.models import load_model
+import math
 
 #GPU使わない方がはやい
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
@@ -17,6 +18,7 @@ app = Flask(__name__)
 
 #symbol = "EURUSD"
 symbol = "GBPJPY"
+
 db_no = 7
 
 maxlen = 100
@@ -29,7 +31,8 @@ n_hidden =  30
 n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
-border = 0.54
+border = 0.56
+askbid = "_bid"
 
 current_dir = os.path.dirname(__file__)
 ini_file = os.path.join(current_dir,"config","config.ini")
@@ -41,7 +44,7 @@ logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
 
 file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop)
+                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid
 
 model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5")
 
@@ -63,7 +66,7 @@ else:
 graph = tf.get_default_graph()
 
 def get_redis_data():
-    print("DB_NO:", db_no)
+    #print("DB_NO:", db_no)
     r = redis.Redis(host='localhost', port=6379, db=db_no)
     result = r.zrevrange(symbol, 0  , maxlen
                       , withscores=False)
@@ -74,12 +77,22 @@ def get_redis_data():
     for line in result:
         tmps = json.loads(line.decode('utf-8'))
         close_tmp.append(tmps.get("close"))
-    #logger.info(close_tmp[len(result)-3:])
+    #logger.info(close_tmp)
+    """
+    close = np.ones(maxlen, dtype=np.float32)
+    c =0
+    for i in close_tmp:
+        if c!=0:
+            logger.info(close_tmp[c]/close_tmp[c-1]);
+            logger.info(math.log((close_tmp[c] / close_tmp[c - 1])))
+            close[c -1] = 10000 * math.log((close_tmp[c] / close_tmp[c - 1]))
+        c = c+1
+    """
     close = 10000 * np.log(close_tmp/shift(close_tmp, 1, cval=np.NaN) )[1:]
 
     dataX = np.zeros((1,maxlen, 1))
     dataX[:, :, 0] = close[:]
-    #print("X SHAPE:", dataX.shape)
+    print("X:", dataX)
 
     return dataX
 

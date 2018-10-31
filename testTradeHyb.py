@@ -29,10 +29,10 @@ pred_term = 6
 rec_num = 10000 + maxlen + pred_term + 1
 batch_size = 8192 * gpu_count
 
-start = datetime(2018, 7, 26,22)
+start = datetime(2018, 7, 30,22)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2018, 7, 28 )
+end = datetime(2018, 9, 1 )
 end_stp = int(time.mktime(end.timetuple()))
 
 host = "127.0.0.1"
@@ -40,12 +40,13 @@ db_no = 12
 s = "5"
 int_s = int(s)
 
-db_suffixs = (1,2,3,4,5)
+#db_suffixs = (1,2,3,4,5)
+db_suffixs = (5,)
 db_suffix_trade = ""
 
 
-
-suffix = ".40*30"
+#suffix = ".40*30"
+suffix = ".28*15"
 askbid = "_bid"
 
 except_index = False
@@ -58,7 +59,7 @@ n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
 
-border = 0.57
+border = 0.56
 payout = 950
 default_money = 1005000
 
@@ -366,14 +367,17 @@ if __name__ == "__main__":
     ax2.plot(predict_money_arr, "b")
 
     print("trade cnt: " + str(trade_cnt))
-    print("trade correct: " + str(trade_win_cnt / trade_cnt))
+    if trade_cnt != 0:
+        print("trade correct: " + str(trade_win_cnt / trade_cnt))
     print("trade money: " + str(trade_money))
 
     for db_index in db_suffixs:
         print("predict cnt " + str(db_index) + ": " + str(predict_cnts[db_index -1]))
-        print("predict correct " + str(db_index) + ": "  + str(predict_win_cnts[db_index -1] / predict_cnts[db_index -1]))
+        if predict_cnts[db_index -1] != 0:
+            print("predict correct " + str(db_index) + ": "  + str(predict_win_cnts[db_index -1] / predict_cnts[db_index -1]))
 
     print("predict cnt all: " + str(predict_cnt))
-    print("predict correct all: " + str(predict_win_cnt / predict_cnt))
+    if predict_cnt!= 0:
+        print("predict correct all: " + str(predict_win_cnt / predict_cnt))
     print("predict money: " + str(predict_money))
     plt.show()

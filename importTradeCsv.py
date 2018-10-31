@@ -6,8 +6,8 @@ import json
 
 symbol = "GBPJPY_TRADE"
 
-#file_path = "/tmp/HL100005_2018_07_13_21_42_20 (1).csv"
-file_path = ""
+file_path = "/tmp/HL100005_2018_10_02_02_34_18.csv"
+#file_path = ""
 csv_file = open(file_path, "r", encoding="shift-jis", errors="", newline="" )
 csv_reader = csv.reader(csv_file, delimiter=",", doublequote=True, lineterminator="\n", quotechar='"', skipinitialspace=True)
 
@@ -23,8 +23,11 @@ for row in csv_reader:
         body["result"] = "lose"
     body["timeStr"] = row[9].split(" ")[0].replace("/", "-") + "T" + row[9].split(" ")[1] + ".000Z"
     score = int(time.mktime(datetime.strptime(row[9].replace("/", "-") , '%Y-%m-%d %H:%M:%S').timetuple()))
-    #print(body)
-    r.zadd(symbol , json.dumps(body), score)
+
+    imp = r.zrangebyscore(symbol, score, score)
+    if len(imp) == 0:
+        #print(body)
+        r.zadd(symbol , json.dumps(body), score)
 """
 tradeReult = r.zrange(symbol  , 0, 10)
 tmps = json.loads(tradeReult[0].decode('utf-8'))

@@ -1,3 +1,60 @@
+From0515To0622
+100
+28*10
+predict money: 1583750
+Accuracy over 0.54: 0.5376569037656904
+
+predict money: 1545400
+Accuracy over 0.55: 0.5612441027433165
+
+predict money: 1354000
+Accuracy over 0.56: 0.5723793677204659
+
+predict money: 1239850
+Accuracy over 0.57: 0.5861229458307973
+
+40*20
+predict money: 1425100
+Accuracy over 0.55: 0.5473178542834267
+
+predict money: 1372650
+Accuracy over 0.56: 0.5690838555655028
+
+300
+12*20
+predict money: 1360000
+Accuracy over 0.54: 0.5265137269650244
+
+predict money: 1408600
+Accuracy over 0.55: 0.5491573033707865
+
+predict money: 1194700
+Accuracy over 0.56: 0.5498098859315589
+
+28*10
+predict money: 1372950
+Accuracy over 0.55: 0.5433236340122858
+
+predict money: 1393900
+Accuracy over 0.56: 0.57664
+
+predict money: 1213100
+Accuracy over 0.57: 0.5856655290102389
+
+28*15
+
+predict money: 1412050
+Accuracy over 0.56: 0.5769112680380718
+
+predict money: 1256750
+Accuracy over 0.57: 0.5939660590823381
+
+40*15
+trade accuracy: 0.5657467532467533
+trade money: 1132150
+predict money: 1315100
+Accuracy over 0.56: 0.5737265415549598
+
 From0601To0630
 100
 28*10
@@ -65,60 +122,187 @@ trade money: 1063400
 predict money: 1195150
 Accuracy over 0.57: 0.5962360992301112
 
+From0601To0630
+28*15
+0.56
+trade cnt: 1001
+trade accuracy: 0.5464535464535465
+trade money: 1070650
+predict money: 1273700
+Accuracy over 0.56: 0.5789726356216994
+Total: 2083
 
-From0515To0622
-100
-28*10
-predict money: 1583750
-Accuracy over 0.54: 0.5376569037656904
+40*30
+0.57
+trade cnt: 530
+trade accuracy: 0.5735849056603773
+trade money: 1193400
+predict money: 1595850
+Accuracy over 0.57: 0.59375
+Total: 1248
 
-predict money: 1545400
-Accuracy over 0.55: 0.5612441027433165
+From0701To0730
+28*15
+0.56
+trade cnt: 1113
+trade accuracy: 0.5570530098831986
+trade money: 1101000
+predict money: 1304200
+Accuracy over 0.56: 0.6040428061831153
+Total: 1682
 
-predict money: 1354000
-Accuracy over 0.56: 0.5723793677204659
+40*30
+0.57
+trade cnt: 558
+trade accuracy: 0.578853046594982
+trade money: 1220550
+predict money: 1737150
+Accuracy over 0.57: 0.6173767752715121
+Total: 1197
 
-predict money: 1239850
-Accuracy over 0.57: 0.5861229458307973
 
-40*20
-predict money: 1425100
-Accuracy over 0.55: 0.5473178542834267
+From0801To0831
+40*30
+0.57
+trade cnt: 3319
+trade correct: 0.532389273877674
+trade money: 1131650
+predict cnt 1: 1323
+predict correct 1: 0.5593348450491308
+predict cnt 2: 1384
+predict correct 2: 0.565028901734104
+predict cnt 3: 1369
+predict correct 3: 0.5493060628195763
+predict cnt 4: 1451
+predict correct 4: 0.5396278428669883
+predict cnt 5: 1287
+predict correct 5: 0.5516705516705517
+predict cnt all: 6814
+predict correct all: 0.5528324038743763
+predict money: 1536650
 
-predict money: 1372650
-Accuracy over 0.56: 0.5690838555655028
-
-300
-12*20
-predict money: 1360000
-Accuracy over 0.54: 0.5265137269650244
-
-predict money: 1408600
-Accuracy over 0.55: 0.5491573033707865
-
-predict money: 1194700
-Accuracy over 0.56: 0.5498098859315589
-
-28*10
-predict money: 1372950
-Accuracy over 0.55: 0.5433236340122858
-
-predict money: 1393900
-Accuracy over 0.56: 0.57664
-
-predict money: 1213100
-Accuracy over 0.57: 0.5856655290102389
+40*30
+0.58
+trade cnt: 1625
+trade correct: 0.5193846153846153
+trade money: 1025800
+predict cnt 1: 720
+predict correct 1: 0.5625
+predict cnt 2: 756
+predict correct 2: 0.5595238095238095
+predict cnt 3: 737
+predict correct 3: 0.5508819538670285
+predict cnt 4: 830
+predict correct 4: 0.5277108433734939
+predict cnt 5: 708
+predict correct 5: 0.556497175141243
+predict cnt all: 3751
+predict correct all: 0.5507864569448148
+predict money: 1282700
 
 28*15
+0.56
+trade cnt: 429
+trade correct: 0.5594405594405595
+trade money: 1044000
+predict cnt 5: 1958
+predict correct 5: 0.5582226762002043
+predict cnt all: 1958
+predict correct all: 0.5582226762002043
+predict money: 1178350
 
-predict money: 1412050
-Accuracy over 0.56: 0.5769112680380718
+From0901To0930
+40*30
+0.57
+trade cnt: 3354
+trade correct: 0.5250447227191414
+trade money: 1084950
+predict cnt 1: 1394
+predict correct 1: 0.5559540889526542
+predict cnt 2: 1474
+predict correct 2: 0.5576662143826323
+predict cnt 3: 1443
+predict correct 3: 0.5717255717255717
+predict cnt 4: 1455
+predict correct 4: 0.554639175257732
+predict cnt 5: 1458
+predict correct 5: 0.5761316872427984
+predict cnt all: 7224
+predict correct all: 0.5632613510520488
+predict money: 1715550
 
-predict money: 1256750
-Accuracy over 0.57: 0.5939660590823381
+From0901To0930
+28*15
+0.56
+trade cnt: 504
+trade correct: 0.5456349206349206
+trade money: 1037250
+predict cnt 5: 2343
+predict correct 5: 0.5723431498079385
+predict cnt all: 2343
+predict correct all: 0.5723431498079385
+predict money: 1276950
 
-40*15
-trade accuracy: 0.5657467532467533
-trade money: 1132150
-predict money: 1315100
-Accuracy over 0.56: 0.5737265415549598
+From1001To1031
+28*15
+0.55
+trade cnt: 1292
+trade correct: 0.9613003095975232
+trade wrong cnt: 50
+trade wrong win cnt: 23
+trade wrong lose cnt: 27
+trade accuracy: 0.5247678018575851
+trade money: 1095300
+predict money: 1669500
+Accuracy over 0.55: 0.5422937208095485
+Total: 3854
+
+0.56
+trade cnt: 1292
+trade correct: 0.9613003095975232
+trade wrong cnt: 50
+trade wrong win cnt: 23
+trade wrong lose cnt: 27
+trade accuracy: 0.5247678018575851
+trade money: 1095300
+predict money: 1548300
+Accuracy over 0.56: 0.5621679064824655
+Total: 1882
+
+28*15
+0.57
+trade cnt: 641
+trade correct: 0.9578783151326054
+trade wrong cnt: 27
+trade wrong win cnt: 11
+trade wrong lose cnt: 16
+trade accuracy: 0.5039001560062403
+trade money: 971550
+predict money: 1170900
+Accuracy over 0.57: 0.542766631467793
+Total: 947
+
+40*30
+0.57
+trade cnt: 579
+trade correct: 0.9602763385146805
+trade wrong cnt: 23
+trade wrong win cnt: 11
+trade wrong lose cnt: 12
+trade accuracy: 0.5613126079447323
+trade money: 1169250
+predict money: 1431150
+Accuracy over 0.57: 0.5744500846023689
+Total: 1182
+
+0.58
+trade cnt: 355
+trade correct: 0.9661971830985916
+trade wrong cnt: 12
+trade wrong win cnt: 7
+trade wrong lose cnt: 5
+trade accuracy: 0.5605633802816902
+trade money: 1104150
+predict money: 1285950
+Accuracy over 0.58: 0.590032154340836
+Total: 622

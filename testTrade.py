@@ -29,10 +29,10 @@ pred_term = 6
 rec_num = 10000 + maxlen + pred_term + 1
 batch_size = 8192 * gpu_count
 
-start = datetime(2018, 7, 26,22)
+start = datetime(2018, 5, 31,22)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2018, 7, 28 )
+end = datetime(2018, 7, 1 )
 end_stp = int(time.mktime(end.timetuple()))
 
 host = "127.0.0.1"
@@ -42,7 +42,8 @@ int_s = int(s)
 
 db_suffix = ""
 db_suffix_trade = ""
-suffix = ".28*15"
+suffix = ".40*30"
+#suffix = ".28*15"
 askbid = "_bid"
 
 except_index = False
@@ -55,8 +56,10 @@ n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
 
-border = 0.56
-payout = 950
+border = 0.57
+payout = 950*3
+payoff = 1000*3
+
 default_money = 1005000
 
 spread = 1
@@ -355,8 +358,8 @@ if __name__ == "__main__":
                 money_trade = money_trade + payout
                 money_notice_try = money_notice_try + payout
             else:
-                money_trade = money_trade - 1000
-                money_notice_try = money_notice_try - 1000
+                money_trade = money_trade - payoff
+                money_notice_try = money_notice_try - payoff
         else:
             #NoticeMSG出た場合は1,2,3秒あとにトレードしている
             tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +1, ps +1)
@@ -380,7 +383,7 @@ if __name__ == "__main__":
                     notice_try_win_cnt = notice_try_win_cnt + 1
                     money_notice_try = money_notice_try + payout
                 else:
-                    money_notice_try = money_notice_try - 1000
+                    money_notice_try = money_notice_try - payoff
             else:
                 if max == 0 or max == 2:
                     not_trade_cnt += 1
@@ -417,9 +420,9 @@ if __name__ == "__main__":
                                   )
             else :
                 if fx == False:
-                    money = money - 1000
+                    money = money - payoff
                     if len(tradeReult) != 0:
-                        money_not_notice = money_not_notice - 1000
+                        money_not_notice = money_not_notice - payoff
                 wrong_list_up_x[cnt_up_wrong] = pt
                 wrong_list_up_y[cnt_up_wrong] = p
                 cnt_up_wrong = cnt_up_wrong + 1
@@ -466,9 +469,9 @@ if __name__ == "__main__":
 
             else:
                 if fx == False:
-                    money = money - 1000
+                    money = money - payoff
                     if len(tradeReult) != 0:
-                        money_not_notice = money_not_notice - 1000
+                        money_not_notice = money_not_notice - payoff
                 wrong_list_down_x[cnt_down_wrong] = pt
                 wrong_list_down_y[cnt_down_wrong] = p
                 cnt_down_wrong = cnt_down_wrong + 1

@@ -14,14 +14,14 @@ import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,}
 db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT",}
 export_db_no = 8
 
-export_host = "ubuntu2"
+export_host = "ubuntu1"
 import_host = "127.0.0.1"
 
 
-start = datetime(2018, 7, 26)
+start = datetime(2018, 10, 29)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2018, 7, 28)
+end = datetime(2018, 11, 1)
 end_stp = int(time.mktime(end.timetuple()))
 
 def import_data():

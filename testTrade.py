@@ -18,73 +18,23 @@ from keras.utils.training_utils import multi_gpu_model
 import time
 from indices import index
 from decimal import Decimal
+from readConf import *
 
-#symbol = "AUDUSD"
-symbol = "GBPJPY"
-#symbol = "EURUSD"
+merg = ""
+if merg != "":
+    merg = "_merg_" + merg
 
-gpu_count = 1
-maxlen = 300
-pred_term = 6
-rec_num = 10000 + maxlen + pred_term + 1
-batch_size = 8192 * gpu_count
-
-start = datetime(2018, 5, 31,22)
-start_stp = int(time.mktime(start.timetuple()))
-
-end = datetime(2018, 7, 1 )
-end_stp = int(time.mktime(end.timetuple()))
-
-host = "127.0.0.1"
-db_no = 11
-s = "5"
-int_s = int(s)
-
-db_suffix = ""
-db_suffix_trade = ""
-suffix = ".40*30"
-#suffix = ".28*15"
-askbid = "_bid"
-
-except_index = False
-except_highlow = True
-
-drop = 0.1
-np.random.seed(0)
-n_hidden =  30
-n_hidden2 = 0
-n_hidden3 = 0
-n_hidden4 = 0
-
-border = 0.57
-payout = 950*3
-payoff = 1000*3
-
-default_money = 1005000
-
-spread = 1
+border = 0.56
 
 fx = False
 fx_position = 10000
 fx_spread = 1
 
-in_num=1
-
 current_dir = os.path.dirname(__file__)
-ini_file = os.path.join(current_dir,"config","config.ini")
-config = configparser.ConfigParser()
-config.read(ini_file)
-MODEL_DIR = config['lstm']['MODEL_DIR']
-
-type = 'bydrop'
-
-file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid
 
 logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
 
-model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5" + suffix)
 
 def get_redis_data():
     print("DB_NO:", db_no)
@@ -109,6 +59,7 @@ def get_redis_data():
         score = line[1]
         tmps = json.loads(body)
         close_t = tmps.get("close")
+
         close_tmp.append(tmps.get("close"))
         time_tmp.append(tmps.get("time"))
         score_tmp.append(score)
@@ -128,7 +79,7 @@ def get_redis_data():
     same =0
     data_length = len(close) - maxlen - pred_term -1
     print("data_length:" + str(data_length))
-
+    print(close[0:5])
     for i in range(data_length):
         continue_flg = False
 
@@ -150,7 +101,6 @@ def get_redis_data():
             if continue_flg:
                 continue;
         #ハイローオーストラリアの取引時間外を学習対象からはずす
-        except_list = [20, 21, 22]
         if except_highlow:
             if datetime.strptime(time_tmp[1 + i + maxlen -1], '%Y-%m-%d %H:%M:%S').hour in except_list:
                 continue;
@@ -159,7 +109,7 @@ def get_redis_data():
         tmp_time_aft = datetime.strptime(time_tmp[1 + i + maxlen -1], '%Y-%m-%d %H:%M:%S')
         delta =tmp_time_aft - tmp_time_bef
 
-        if delta.total_seconds() > ((maxlen-1) * int_s):
+        if delta.total_seconds() > ((maxlen-1) * int(s)):
             #print(tmp_time_aft)
             continue;
         close_data.append(close[i:(i + maxlen)])
@@ -177,11 +127,11 @@ def get_redis_data():
         aft = close_tmp[1 + i + maxlen + pred_term -1]
 
         #正解をいれる
-        if float(Decimal(str(aft)) - Decimal(str(bef))) >= 0.001 * spread:
+        if float(Decimal(str(aft)) - Decimal(str(bef))) >= float(Decimal("0.001") * Decimal(str(spread))):
             #上がった場合
             label_data.append([1,0,0])
             up = up + 1
-        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= 0.001 * spread:
+        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") * Decimal(str(spread))):
             label_data.append([0,0,1])
         else:
             label_data.append([0,1,0])
@@ -221,7 +171,7 @@ def get_model():
     if os.path.isfile(model_file):
         model = load_model(model_file)
         #model_gpu = multi_gpu_model(model, gpus=gpu_count)
-        model.compile(loss='categorical_crossentropy',optimizer='rmsprop', metrics=['accuracy'])
+        model.compile(loss='categorical_crossentropy',optimizer='adam', metrics=['accuracy'])
         print("Load Model")
         return model
     else:
@@ -342,7 +292,7 @@ if __name__ == "__main__":
         max = x.argmax()
         probe = str(x[max])
 
-        tradeReult = r.zrangebyscore(symbol + "_TRADE" + db_suffix_trade, ps, ps)
+        tradeReult = r.zrangebyscore(symbol + "_TRADE", ps, ps)
         startVal = "NULL"
         endVal = "NULL"
         result = "NULL"
@@ -361,9 +311,9 @@ if __name__ == "__main__":
                 money_trade = money_trade - payoff
                 money_notice_try = money_notice_try - payoff
         else:
-            #NoticeMSG出た場合は1,2,3秒あとにトレードしている
+            #1あとにトレードしている
             tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +1, ps +1)
-
+            """
             if len(tradeReultNotice) == 0:
                 tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +2, ps +2)
 
@@ -372,7 +322,7 @@ if __name__ == "__main__":
 
             if len(tradeReultNotice) == 0:
                 tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps + 4, ps + 4)
-
+            """
             if len(tradeReultNotice) != 0:
                 notice_try_cnt = notice_try_cnt + 1
                 tmps = json.loads(tradeReultNotice[0].decode('utf-8'))

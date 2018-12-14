@@ -245,18 +245,6 @@ predict money: 1276950
 
 From1001To1031
 28*15
-0.55
-trade cnt: 1292
-trade correct: 0.9613003095975232
-trade wrong cnt: 50
-trade wrong win cnt: 23
-trade wrong lose cnt: 27
-trade accuracy: 0.5247678018575851
-trade money: 1095300
-predict money: 1669500
-Accuracy over 0.55: 0.5422937208095485
-Total: 3854
-
 0.56
 trade cnt: 1292
 trade correct: 0.9613003095975232
@@ -306,3 +294,14 @@ trade money: 1104150
 predict money: 1285950
 Accuracy over 0.58: 0.590032154340836
 Total: 622
+
+From1101To1130
+40*30
+0.57
+
+trade cnt: 1793
+trade accuracy: 0.5264919129949804
+trade money: 478000
+predict money: 2087500
+Accuracy over 0.57: 0.5532477341389728
+Total: 2648

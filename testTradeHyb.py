@@ -29,7 +29,7 @@ pred_term = 6
 rec_num = 10000 + maxlen + pred_term + 1
 batch_size = 8192 * gpu_count
 
-start = datetime(2018, 7, 30,22)
+start = datetime(2018, 7, 31,22)
 start_stp = int(time.mktime(start.timetuple()))
 
 end = datetime(2018, 9, 1 )
@@ -46,7 +46,7 @@ db_suffix_trade = ""
 
 
 #suffix = ".40*30"
-suffix = ".28*15"
+suffix = ".40*40"
 askbid = "_bid"
 
 except_index = False
@@ -59,9 +59,15 @@ n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
 
-border = 0.56
-payout = 950
-default_money = 1005000
+merg = "3"
+if merg != "":
+    merg = "_merg_" + merg
+
+border = 0.58
+payout = 950*10
+payoff = 1000*10
+
+default_money = 0
 
 spread = 1
 
@@ -80,7 +86,7 @@ MODEL_DIR = config['lstm']['MODEL_DIR']
 type = 'bydrop'
 
 file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid
+                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid + merg
 
 logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
@@ -341,14 +347,14 @@ if __name__ == "__main__":
             if predicts[score] == "win":
                 predict_money = predict_money + payout
             else:
-                predict_money = predict_money - 1000
+                predict_money = predict_money - payoff
             if score in trades.keys():
                 trade_cnt = trade_cnt + 1
                 if trades[score] == "win":
                     trade_money = trade_money + payout
                     trade_win_cnt = trade_win_cnt + 1
                 else:
-                    trade_money = trade_money - 1000
+                    trade_money = trade_money - payoff
 
         predict_money_arr.append(predict_money)
         trade_money_arr.append(trade_money)

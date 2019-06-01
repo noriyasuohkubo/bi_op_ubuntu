@@ -20,13 +20,13 @@ symbol = "GBPJPY"
 
 db_no = 7
 
-maxlen = 300
-drop = 0.1
+maxlen = 400
+drop = 0.0
 in_num=1
 pred_term = 15
 s = "2"
 
-suffix = ".41*15"
+suffix = ".70*8"
 
 bin_type = ""
 spread = 1
@@ -34,7 +34,7 @@ if bin_type == "_spread":
     bin_type = bin_type + str(spread -1)
 
 np.random.seed(0)
-n_hidden =  30
+n_hidden =  40
 n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0

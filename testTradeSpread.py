@@ -20,8 +20,6 @@ from indices import index
 from decimal import Decimal
 from readConf import *
 
-border = 0.56
-
 bin_type = "_spread"
 if bin_type == "_spread":
     bin_type = bin_type + str(spread -1)
@@ -46,6 +44,7 @@ def get_redis_data(db):
     score_tmp = []
     spread_tmp = []
     payout_tmp = {}
+    spread_dict = {}
 
     print(result[0:5])
     print(result[-5:])
@@ -65,18 +64,28 @@ def get_redis_data(db):
         close_tmp.append(tmps.get("close"))
         time_tmp.append(tmps.get("time"))
         score_tmp.append(score)
-        spread_tmp.append(tmps.get("spread"))
+        spr = tmps.get("spreadAus")/100
+        spread_tmp.append(spr)
+
+        if spr in spread_dict.keys():
+            spread_dict[spr] = spread_dict[spr] + 1
+        else:
+            spread_dict[spr] = 1
+
         pay = tmps.get("payout")
         if pay in payout_tmp.keys():
             payout_tmp[pay] = payout_tmp[pay] + 1
         else:
             payout_tmp[pay] = 1
 
-        if close_t == 0.0:
+        if int(close_t) == 0:
             print("close:0 " + str(score))
         #high_tmp.append(tmps.get("high"))
         #low_tmp.append(tmps.get("low"))
-        closes_tmp[score] = close_t
+        closes_tmp[score] = (close_t, tmps.get("spreadAus")/100)
+
+    for i in spread_dict.keys():
+        print("SPREAD:" + str(i), spread_dict[i])
 
     for i in payout_tmp.keys():
         print("PAYOUT:" + str(i), payout_tmp[i])
@@ -192,6 +201,7 @@ def get_redis_data(db):
     print("SAME: ", same / len(retY))
     print("DOWN: ", (len(retY) - up - same) / len(retY))
     spread_total = spread1 + spread2 + spread3 + spread4 + spread5 + spread6over + spread0
+
     print("spread total: ", spread_total)
     print("spread0: ", spread0 / spread_total)
     print("spread1: ", spread1 / spread_total)
@@ -233,7 +243,7 @@ def get_label_data(bef, aft, spr, up, same):
         # 上がった場合
         res = [1, 0, 0]
         up = up +1
-    elif float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") * Decimal(str(spr))):
+    elif float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") + Decimal(str(spr))):
         res = [0, 0, 1]
     else:
         same = same +1
@@ -260,7 +270,6 @@ if __name__ == "__main__":
     for tradeReult in tradeReults:
         body = tradeReult[0]
         score = tradeReult[1]
-
         tmps = json.loads(body)
         #startVal = tmps.get("startVal")
         #endVal = tmps.get("endVal")
@@ -297,12 +306,13 @@ if __name__ == "__main__":
     predict_money_arr = []
     trade_money_arr = []
     close_arr = []
+    spread_arr = []
 
     sorted_close = sorted(closes_tmp.items(), key=lambda x: x[0])
     for list in sorted_close:
         score = list[0]
-        close_arr.append(list[1])
-
+        close_arr.append(list[1][0])
+        spread_arr.append(list[1][1])
         #score = int(time.mktime(tmp_start.timetuple()))
         if score in predicts.keys():
             sp = predicts[score][1]
@@ -357,7 +367,7 @@ if __name__ == "__main__":
     print(datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " Now Plotting")
     fig = plt.figure()
     #価格の遷移
-    ax1 = fig.add_subplot(111)
+    ax1 = fig.add_subplot(2,1,1)
     #ax1.plot(time,close)
     ax1.plot(close_arr, 'g')
 
@@ -366,6 +376,10 @@ if __name__ == "__main__":
     ax2.plot(trade_money_arr,"m")
     ax2.plot(predict_money_arr, "b")
 
+    ax3 = fig.add_subplot(2, 1, 2)
+    ax3.plot(spread_arr, 'g')
+
+    print("real trade cnt:", len(tradeReults))
     print("trade cnt: " + str(trade_cnt))
     print("spread0_trade cnt: ", spread0_trade )
     print("spread1_trade cnt: ", spread1_trade )
@@ -389,4 +403,6 @@ if __name__ == "__main__":
     print("predict cnt : " + str(predict_cnt))
     print("predict correct : " + str(predict_win_cnt / predict_cnt))
     print("predict money: " + str(predict_money))
+
+    print("trade cnt rate: " + str(trade_cnt / predict_cnt))
     plt.show()

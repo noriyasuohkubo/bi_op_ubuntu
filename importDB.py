@@ -12,20 +12,21 @@ symbol = "GBPJPY"
 symbol_list = {"ubuntu1":(symbol, ),"ubuntu2":(symbol+"1",symbol+"2",symbol+"3",symbol+"4", symbol+"5"),
                "ubuntu3":(symbol+"_OPT",),
                "ubuntu4": (symbol,),
-               "ubuntu5": (symbol + "_SNC", )}
+               "ubuntu4-2": (symbol,),
+               "ubuntu5": (symbol, )}
 
-import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu5":15}
-db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu5":"_SNC"}
+import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu4-2":10,"ubuntu5":14}
+db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":""}
 export_db_no = 8
 
-export_host = "ubuntu4"
+export_host = "ubuntu5"
 import_host = "127.0.0.1"
 
 
-start = datetime(2018, 12, 11)
+start = datetime(2019, 4, 30)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2018, 12, 14)
+end = datetime(2019, 6, 1)
 end_stp = int(time.mktime(end.timetuple()))
 
 def import_data():

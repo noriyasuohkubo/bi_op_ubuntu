@@ -24,8 +24,6 @@ merg = ""
 if merg != "":
     merg = "_merg_" + merg
 
-border = 0.56
-
 fx = False
 fx_position = 10000
 fx_spread = 1
@@ -35,6 +33,7 @@ current_dir = os.path.dirname(__file__)
 logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
 
+percentUP_cnt ={}
 
 def get_redis_data():
     print("DB_NO:", db_no)
@@ -44,6 +43,9 @@ def get_redis_data():
     close_tmp, high_tmp, low_tmp = [], [], []
     time_tmp = []
     score_tmp = []
+    spread_tmp = []
+    payout_tmp = {}
+
     print(result[0:5])
     print(result[-5:])
     #result.reverse()
@@ -62,11 +64,31 @@ def get_redis_data():
 
         close_tmp.append(tmps.get("close"))
         time_tmp.append(tmps.get("time"))
+
         score_tmp.append(score)
+        #print("spread",tmps.get("spread"))
+        if tmps.get("spread") == None:
+            spread_tmp.append(0.0)
+        else:
+            spread_tmp.append(tmps.get("spread"))
+
+        if tmps.get("payout") == None:
+            pay = 0.000
+        else:
+            pay = tmps.get("payout")
+
+        if pay in payout_tmp.keys():
+            payout_tmp[pay] = payout_tmp[pay] + 1
+        else:
+            payout_tmp[pay] = 1
+
         if close_t == 0.0:
             print("close:0 " + str(score))
         #high_tmp.append(tmps.get("high"))
         #low_tmp.append(tmps.get("low"))
+    #Payoutの種類確認
+    for i in payout_tmp.keys():
+        print("PAYOUT:" + str(i), payout_tmp[i])
 
     close = 10000 * np.log(close_tmp/shift(close_tmp, 1, cval=np.NaN) )[1:]
     #high = 10000 * np.log(high_tmp / shift(high_tmp, 1, cval=np.NaN) )[1:]
@@ -74,6 +96,8 @@ def get_redis_data():
 
     close_data, high_data, low_data, label_data, time_data, price_data , predict_time_data, predict_score_data , end_price_data \
         = [], [], [], [], [], [], [], [], []
+    spread_data = []
+    spread_cnt = {}
 
     up =0
     same =0
@@ -112,6 +136,12 @@ def get_redis_data():
         if delta.total_seconds() > ((maxlen-1) * int(s)):
             #print(tmp_time_aft)
             continue;
+
+        spr = spread_tmp[1 + i + maxlen - 1]
+        if limit_border_flg:
+            if spr <= border_spread:
+                continue
+
         close_data.append(close[i:(i + maxlen)])
         time_data.append(time_tmp[1 + i + maxlen -1])
         price_data.append(close_tmp[1 + i + maxlen -1])
@@ -119,6 +149,20 @@ def get_redis_data():
         predict_time_data.append(time_tmp[1 + i + maxlen])
         predict_score_data.append(score_tmp[1 + i + maxlen ])
         end_price_data.append(close_tmp[1 + i + maxlen + pred_term - 1])
+
+        spread_data.append(spr)
+
+        flg = False
+        for k, v in spread_list.items():
+            if spr > v[0] and spr <= v[1]:
+                spread_cnt[k] = spread_cnt.get(k,0) + 1
+                flg = True
+                break
+        if flg == False:
+            if spr < 0:
+                spread_cnt["spread0"] = spread_cnt.get("spread0", 0) + 1
+            else:
+                spread_cnt["spread16Over"] = spread_cnt.get("spread16Over",0) + 1
 
         #high_data.append(high[i:(i + maxlen)])
         #low_data.append(low[i:(i + maxlen)])
@@ -131,8 +175,10 @@ def get_redis_data():
             #上がった場合
             label_data.append([1,0,0])
             up = up + 1
+
         elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") * Decimal(str(spread))):
             label_data.append([0,0,1])
+
         else:
             label_data.append([0,1,0])
             same = same + 1
@@ -147,7 +193,8 @@ def get_redis_data():
 
     close_tmp_np = np.array(close_tmp)
     time_tmp_np = np.array(time_tmp)
-
+    spread_tmp_np = np.array(spread_tmp)
+    spread_np = np.array(spread_data)
     #high_np = np.array(high_data)
     #low_np = np.array(low_data)
 
@@ -164,7 +211,15 @@ def get_redis_data():
     print("SAME: ", same / len(retY))
     print("DOWN: ", (len(retY) - up - same) / len(retY))
 
-    return retX, retY, price_np, time_np, close_tmp_np, time_tmp_np, predict_time_np, predict_score_np, end_price_np
+
+
+    spread_len = len(spread_data)
+    print("spread total: ", spread_len)
+    if spread_len != 0:
+        for k, v in sorted(spread_cnt.items()):
+            print(k, v/spread_len)
+
+    return retX, retY, price_np, time_np, close_tmp_np, time_tmp_np, predict_time_np, predict_score_np, end_price_np, spread_np, spread_tmp_np
 
 def get_model():
 
@@ -193,7 +248,9 @@ def do_predict(test_X, test_Y):
 
 
 if __name__ == "__main__":
-    dataX, dataY, price_data, time_data, close, time, predict_time, predict_score, end_price = get_redis_data()
+    spread_trade = {}
+    spread_win = {}
+    dataX, dataY, price_data, time_data, close, time, predict_time, predict_score, end_price, spread_data, spread_tmp = get_redis_data()
     res = do_predict(dataX,dataY)
 
     ind5 = np.where(res >=border)[0]
@@ -204,6 +261,7 @@ if __name__ == "__main__":
     pt5= predict_time[ind5]
     ps5 = predict_score[ind5]
     ep5 = end_price[ind5]
+    sp5 = spread_data[ind5]
 
     print(t5[0:10])
 
@@ -286,8 +344,10 @@ if __name__ == "__main__":
     notice_try_win_cnt = 0
     not_trade_cnt = 0
 
+    predicts = {}
+
     r = redis.Redis(host=host, port=6379, db=db_no)
-    for x,y,p,t,pt,ps,ep in zip(x5,y5,p5,t5, pt5, ps5, ep5):
+    for x,y,p,t,pt,ps,ep,sp in zip(x5,y5,p5,t5, pt5, ps5, ep5, sp5):
 
         max = x.argmax()
         probe = str(x[max])
@@ -297,6 +357,8 @@ if __name__ == "__main__":
         endVal = "NULL"
         result = "NULL"
         correct = "NULL"
+        #tradeCnt = r.zrangebyscore(symbol + "_TRADE", start_stp, end_stp)
+        #print("trade length:", len(tradeCnt))
         if len(tradeReult) != 0:
             trade_cnt = trade_cnt +1
             tmps = json.loads(tradeReult[0].decode('utf-8'))
@@ -307,6 +369,7 @@ if __name__ == "__main__":
                 trade_win_cnt = trade_win_cnt +1
                 money_trade = money_trade + payout
                 money_notice_try = money_notice_try + payout
+
             else:
                 money_trade = money_trade - payoff
                 money_notice_try = money_notice_try - payoff
@@ -339,6 +402,26 @@ if __name__ == "__main__":
                     not_trade_cnt += 1
             notice_cnt += 1
 
+        if max == 0 or max == 2:
+            res = "win" if max == y.argmax() else "lose"
+
+            flg = False
+            for k, v in spread_list.items():
+                if sp > v[0] and sp <= v[1]:
+                    spread_trade[k] = spread_trade.get(k, 0) + 1
+                    if res == "win":
+                        spread_win[k] = spread_win.get(k, 0) + 1
+                    flg = True
+                    break
+            if flg == False:
+                if sp < 0:
+                    spread_trade["spread0"] = spread_trade.get("spread0", 0) + 1
+                    if result == "win":
+                        spread_win["spread0"] = spread_win.get("spread0", 0) + 1
+                else:
+                    spread_trade["spread16Over"] = spread_trade.get("spread16Over", 0) + 1
+                    if result == "win":
+                        spread_win["spread16Over"] = spread_win.get("spread16Over", 0) + 1
         if max == 0:
             # Up predict
             if fx:
@@ -481,7 +564,7 @@ if __name__ == "__main__":
     print(datetime.now().strftime("%Y/%m/%d %H:%M:%S") + " Now Plotting")
     fig = plt.figure()
     #価格の遷移
-    ax1 = fig.add_subplot(111)
+    ax1 = fig.add_subplot(2,1,1)
     #ax1.plot(time,close)
     ax1.plot(close, 'g')
 
@@ -497,6 +580,9 @@ if __name__ == "__main__":
     ax2.plot(money_trade_y,"r")
     ax2.plot(money_not_notice_y, "y")
     ax2.plot(money_notice_try_y, "m")
+
+    ax3 = fig.add_subplot(2, 1, 2)
+    ax3.plot(spread_tmp, 'g')
 
     index = np.arange(0,len(money_x),3600// int(s))
     plt.xticks(index,money_x[index])
@@ -532,6 +618,13 @@ if __name__ == "__main__":
     print("Accuracy over " + str(border) + ":", tmp_acc)
     print("Total:", len(up_ind5) + len(down_ind5))
     print("Correct:", (len(up_ind5) + len(down_ind5)) * tmp_acc)
+    print("trade cnt rate: " + str(trade_cnt/(len(up_ind5) + len(down_ind5))))
 
-    plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
+    for k, v in sorted(spread_list.items()):
+        if spread_trade.get(k, 0) != 0:
+            print(k, " cnt:", spread_trade.get(k, 0), " win rate:", spread_win.get(k, 0) / spread_trade.get(k))
+        else:
+            print(k, " cnt:", spread_trade.get(k, 0))
+
+    #plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
     plt.show()

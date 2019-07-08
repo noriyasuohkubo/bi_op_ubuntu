@@ -13,20 +13,20 @@ symbol_list = {"ubuntu1":(symbol, ),"ubuntu2":(symbol+"1",symbol+"2",symbol+"3",
                "ubuntu3":(symbol+"_OPT",),
                "ubuntu4": (symbol,),
                "ubuntu4-2": (symbol,),
-               "ubuntu5": (symbol, )}
+               "ubuntu5": (symbol, ),"ubuntu": (symbol,),"centos7": (symbol,)}
 
-import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu4-2":10,"ubuntu5":14}
-db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":""}
+import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu4-2":10,"ubuntu5":14,"ubuntu":14,"centos7":14}
+db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":"","ubuntu":"","centos7":""}
 export_db_no = 8
 
-export_host = "ubuntu5"
+export_host = "ubuntu"
 import_host = "127.0.0.1"
 
 
-start = datetime(2019, 4, 30)
+start = datetime(2019, 6, 20)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2019, 6, 1)
+end = datetime(2019, 6, 30)
 end_stp = int(time.mktime(end.timetuple()))
 
 def import_data():

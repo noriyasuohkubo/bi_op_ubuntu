@@ -3,7 +3,7 @@ from datetime import datetime
 from datetime import timedelta
 from keras.utils.training_utils import multi_gpu_model
 import time
-
+os.environ["OMP_NUM_THREADS"] = "3"
 #定数ファイル
 host = "127.0.0.1"
 
@@ -11,17 +11,31 @@ symbol = "GBPJPY"
 symbols = [symbol]
 #symbols = [symbol + "5", symbol + "10",symbol]
 
-export_host = "ubuntu"
+export_host = "noriyasu"
+#取引制限ありと想定して予想させる
+#この場合、必ずしも予想時に実際のトレードがされると限らないので、トレード実績を見たい場合はFalseにする
+restrict_flg = True
+
+#THE OPTIONである
+the_option_flg = False
+
+#TRB or SPR
+type = "SPR"
+
+#デモである
+demo = False
+
 suffix = ".70*8"
 
-border = 0.56
+border = 0.58
+
+#except_list = [20,21,22]
+except_list = [21,22,23]
 
 border_spread = 0.008
 limit_border_flg = False
 
 spread = 1
-
-except_list = [20,21,22]
 
 #for usdjpy
 #except_list = [1,8,10,11,12,17,18,19,20,21,22]
@@ -36,18 +50,20 @@ except_list = [20,21,22]
 #for gbpjpy snc
 #except_list = [3,4,6,7,8,9,10,11,13,14,15,16,17,20, 21, 22]
 
-payout = 950*10
-payoff = 1000*10
-
-start = datetime(2019, 5, 31,22)
+start = datetime(2019, 9, 1, 22)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2019, 6, 30 )
+end = datetime(2020, 1, 1, 22 )
 end_stp = int(time.mktime(end.timetuple()))
 
 maxlen = 400
 pred_term = 15
 s = "2"
+
+#trb 30:1000, 60:950. 180:900, 500:850
+#spr 30:1200, 60:1100, 180:1050, 300:1000
+payout = 1000
+payoff = 1000
 
 merg = ""
 merg_file = ""
@@ -63,22 +79,38 @@ drop = 0.0
 in_num = 1
 spread = 1
 
-spread_list = {"spread0":(-1,0.000),"spread2":(0.000,0.002), "spread4":(0.002,0.004),"spread6":(0.004,0.006),"spread8":(0.006,0.008)
+spread_list = {"spread0":(-1,0.000),"spread1":(0.000,0.001),"spread2":(0.001,0.002),"spread3":(0.002,0.003), "spread4":(0.003,0.004)
+    ,"spread5":(0.004,0.005),"spread6":(0.005,0.006),"spread7":(0.006,0.007),"spread8":(0.007,0.008)
     , "spread10": (0.008, 0.010), "spread12": (0.010, 0.012), "spread14": (0.012, 0.014), "spread16": (0.014, 0.016),"spread16Over":(0.016,1),}
 
-db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu4-2":10,"ubuntu5":15,"ubuntu":14}
+db_nos = {"opt":1,"snc":1,"noriyasu":11,"yorioko":14,"kazuo":8,"fil":14}
 
 db_no = db_nos[export_host]
 
-db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":"","ubuntu":""}
+#db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":"","ubuntu18":""}
 
 #db_suffixs = (1,2,3,4,5)
 #db_suffixs = ("",)
-db_suffix = db_suffix_trade_list[export_host]
+#db_suffix = db_suffix_trade_list[export_host]
+
+if demo:
+    db_suffix = "_DEMO"
+else:
+    db_suffix = ""
+
+db_key = symbol + "_" + str(int(s) * pred_term)  + "_" + type
+#db_key = symbol
+
+if(the_option_flg):
+    db_key = db_key + "_OPT"
+
+db_key_trade = db_key + "_TRADE"
+print("db_key: " + db_key)
+
 
 model_dir = "/app/bin_op/model"
 gpu_count = 1
-batch_size = 8192* gpu_count
+batch_size = 2048* gpu_count
 
 except_index = False
 except_highlow = True

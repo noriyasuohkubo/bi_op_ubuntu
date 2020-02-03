@@ -1,58 +1,67 @@
 
-import redis
 from datetime import datetime
 import time
-
+import redis
 
 #symbol = "AUDUSD"
 symbol = "GBPJPY"
-#symbol = "EURUSD"
 
 #symbols = (symbol+"2", symbol+"5") #hybrid用
-symbol_list = {"ubuntu1":(symbol, ),"ubuntu2":(symbol+"1",symbol+"2",symbol+"3",symbol+"4", symbol+"5"),
-               "ubuntu3":(symbol+"_OPT",),
-               "ubuntu4": (symbol,),
-               "ubuntu4-2": (symbol,),
-               "ubuntu5": (symbol, ),"ubuntu": (symbol,),"centos7": (symbol,)}
+symbol_list = {"opt": (symbol + "_30_SPR_OPT",),
+               "fil": (symbol + "_30_TRB",),
+               "noriyasu": (symbol + "_30_TRB",symbol + "_30_SPR",symbol + "_60_TRB",symbol + "_60_SPR",),
+               "ig": (symbol + "_2_IG",),
+               }
 
-import_db_nos = {"ubuntu1":11,"ubuntu2":12,"ubuntu3":13,"ubuntu4":14,"ubuntu4-2":10,"ubuntu5":14,"ubuntu":14,"centos7":14}
-db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":"","ubuntu":"","centos7":""}
+import_db_nos = {"opt":1,"snc":1,"noriyasu":11,"yorioko":14,"fil":14,"ig":6}
 export_db_no = 8
 
-export_host = "ubuntu"
+import_db = "ig"
+export_host = "127.0.0.1"
 import_host = "127.0.0.1"
 
+demo_flg = False
+db_post_fix = ""
+if demo_flg:
+    db_post_fix = "_DEMO"
 
-start = datetime(2019, 6, 20)
+
+start = datetime(2019, 11, 1)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2019, 6, 30)
+end = datetime(2020, 2, 10)
 end_stp = int(time.mktime(end.timetuple()))
 
 def import_data():
-    import_db_no = import_db_nos.get(export_host)
-    symbols = symbol_list.get(export_host)
+    import_db_no = import_db_nos.get(import_db)
+    symbols = symbol_list.get(import_db)
 
     export_r = redis.Redis(host= export_host, port=6379, db=export_db_no)
     import_r = redis.Redis(host= import_host, port=6379, db=import_db_no)
-    for sym in symbols:
-        result_data = export_r.zrangebyscore(sym, start_stp, end_stp, withscores=True)
 
+    for sym in symbols:
+        db = sym + db_post_fix
+        result_data = export_r.zrangebyscore(db, start_stp, end_stp, withscores=True)
+        print(db)
         for line in result_data:
             body = line[0]
             score = line[1]
-            imp = import_r.zrangebyscore(sym , score, score)
+            imp = import_r.zrangebyscore(db , score, score)
             if len(imp) == 0:
-                import_r.zadd(sym, body, score)
-    db_suffix_trade = db_suffix_trade_list.get(export_host)
-    result_trade_data = export_r.zrangebyscore(symbol + db_suffix_trade + "_TRADE", start_stp, end_stp, withscores=True)
+                import_r.zadd(db, body, score)
 
-    for line in result_trade_data:
-        body = line[0]
-        score = line[1]
-        imp = import_r.zrangebyscore(symbol + db_suffix_trade + "_TRADE" , score, score)
-        if len(imp) == 0:
-            import_r.zadd(symbol + db_suffix_trade + "_TRADE", body, score)
+        trade_db = sym + "_TRADE" + db_post_fix
+        print(trade_db)
+        result_trade_data = export_r.zrangebyscore(trade_db, start_stp, end_stp, withscores=True)
+
+        for line in result_trade_data:
+            body = line[0]
+            score = line[1]
+            imp = import_r.zrangebyscore(trade_db, score, score)
+            if len(imp) == 0:
+                import_r.zadd(trade_db, body, score)
+
+        import_r.save()
 
 
 if __name__ == "__main__":

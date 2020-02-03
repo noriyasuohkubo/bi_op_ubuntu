@@ -1,4 +1,4 @@
-from flask import Flask, request
+#from flask import Flask, request
 import numpy as np
 import keras.models
 import tensorflow as tf
@@ -13,8 +13,9 @@ from keras.models import load_model
 
 #GPU使わない方がはやい
 os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
-app = Flask(__name__)
+#app = Flask(__name__)
 
+"""
 #symbol = "EURUSD"
 symbol = "GBPJPY"
 
@@ -40,6 +41,7 @@ n_hidden3 = 0
 n_hidden4 = 0
 
 askbid = "_bid"
+"""
 
 current_dir = os.path.dirname(__file__)
 ini_file = os.path.join(current_dir,"config","config.ini")
@@ -49,13 +51,13 @@ MODEL_DIR = config['lstm']['MODEL_DIR']
 
 logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
 logger = logging.getLogger("app")
-
+"""
 file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
                           "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid + bin_type
-print("MODEL:", file_prefix +".hdf5" + suffix)
-model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5" + suffix)
-
-
+                          
+"""
+model_file_name = "GBPJPY_lstmdrop_in1_2_m600_term_30_hid1_60_hid2_0_hid3_0_hid4_0_drop_0.0_bid.hdf5.90*7"
+model_file = os.path.join(MODEL_DIR, model_file_name)
 
 # model and backend graph must be created on global
 global model, graph

@@ -19,10 +19,8 @@ import time
 from indices import index
 from decimal import Decimal
 from readConf import *
-
-merg = ""
-if merg != "":
-    merg = "_merg_" + merg
+#CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
+os.environ["OMP_NUM_THREADS"] = "3"
 
 fx = False
 fx_position = 10000
@@ -38,8 +36,8 @@ percentUP_cnt ={}
 def get_redis_data():
     print("DB_NO:", db_no)
     r = redis.Redis(host= host, port=6379, db=db_no, decode_responses=True)
-    result = r.zrangebyscore(symbol + db_suffix, start_stp, end_stp, withscores=True)
-    #result = r.zrevrange(symbol, 0  , rec_num  , withscores=False)
+    result = r.zrangebyscore(db_key + db_suffix, start_stp, end_stp, withscores=True)
+    #result = r.zrevrange(db_key + db_suffix, 0  , rec_num  , withscores=False)
     close_tmp, high_tmp, low_tmp = [], [], []
     time_tmp = []
     score_tmp = []
@@ -70,7 +68,11 @@ def get_redis_data():
         if tmps.get("spread") == None:
             spread_tmp.append(0.0)
         else:
-            spread_tmp.append(tmps.get("spread"))
+            #0.3などの形で入っているので実際の値にするため1/100にする
+            if(the_option_flg):
+                spread_tmp.append(float(tmps.get("spread")))
+            else:
+                spread_tmp.append(float(tmps.get("spread")) / 100)
 
         if tmps.get("payout") == None:
             pay = 0.000
@@ -104,6 +106,7 @@ def get_redis_data():
     data_length = len(close) - maxlen - pred_term -1
     print("data_length:" + str(data_length))
     print(close[0:5])
+    #tmp_count = 0
     for i in range(data_length):
         continue_flg = False
 
@@ -138,6 +141,7 @@ def get_redis_data():
             continue;
 
         spr = spread_tmp[1 + i + maxlen - 1]
+        # 指定スプレッド以上のトレードは無視する
         if limit_border_flg:
             if spr <= border_spread:
                 continue
@@ -167,16 +171,23 @@ def get_redis_data():
         #high_data.append(high[i:(i + maxlen)])
         #low_data.append(low[i:(i + maxlen)])
 
+        #tmp_count = tmp_count +1
+
         bef = close_tmp[1 + i + maxlen -1]
         aft = close_tmp[1 + i + maxlen + pred_term -1]
-
+        #取引開始時のスプレッド
+        spr_trade = spread
+        if(type == "SPR"):
+            spr_trade = (spr * 1000) + spread
+        #if(tmp_count == 1):
+        #    print("spread_trade", spr_trade)
         #正解をいれる
-        if float(Decimal(str(aft)) - Decimal(str(bef))) >= float(Decimal("0.001") * Decimal(str(spread))):
+        if float(Decimal(str(aft)) - Decimal(str(bef))) >= float(Decimal("0.001") * Decimal(str(spr_trade))):
             #上がった場合
             label_data.append([1,0,0])
             up = up + 1
 
-        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") * Decimal(str(spread))):
+        elif  float(Decimal(str(bef)) - Decimal(str(aft))) >= float(Decimal("0.001") * Decimal(str(spr_trade))):
             label_data.append([0,0,1])
 
         else:
@@ -345,21 +356,47 @@ if __name__ == "__main__":
     not_trade_cnt = 0
 
     predicts = {}
+    # 理論上の予測確率ごとの勝率 key:確率 val:{win_cnt:勝った数, lose_cnt:負けた数}
+    prob_list = {}
+    # 実際のトレードの予測確率ごとの勝率 key:確率 val:{win_cnt:勝った数, lose_cnt:負けた数}
+    prob_real_list = {}
+
+    #前回のトレード開始時間
+    prev_predict_t = ""
 
     r = redis.Redis(host=host, port=6379, db=db_no)
+
+    tmp_cnt = 0
+    cpu_predict_cnt = 0
+    cpu_win_cnt = 0
     for x,y,p,t,pt,ps,ep,sp in zip(x5,y5,p5,t5, pt5, ps5, ep5, sp5):
 
         max = x.argmax()
         probe = str(x[max])
+        percent = probe[0:4]
+        predict_t = datetime.strptime(pt, '%Y-%m-%d %H:%M:%S')
 
-        tradeReult = r.zrangebyscore(symbol + "_TRADE", ps, ps)
+        tradeReult = r.zrangebyscore(db_key_trade + db_suffix, ps, ps)
         startVal = "NULL"
         endVal = "NULL"
         result = "NULL"
         correct = "NULL"
-        #tradeCnt = r.zrangebyscore(symbol + "_TRADE", start_stp, end_stp)
+        #tradeCnt = r.zrangebyscore(db_key_trade + db_suffix, start_stp, end_stp)
         #print("trade length:", len(tradeCnt))
+
+        # 取引制限あるばあい、前回との取引間隔があいてなければトレードなしとする
+        if restrict_flg:
+            if prev_predict_t != "":
+                interval = predict_t - prev_predict_t
+                #10秒以上あける
+                if interval.seconds < ((pred_term * int(s)) + 10):
+                    continue
+
+            prev_predict_t = predict_t
+
         if len(tradeReult) != 0:
+
+            prev_predict_t = predict_t
             trade_cnt = trade_cnt +1
             tmps = json.loads(tradeReult[0].decode('utf-8'))
             startVal = tmps.get("startVal")
@@ -375,16 +412,16 @@ if __name__ == "__main__":
                 money_notice_try = money_notice_try - payoff
         else:
             #1あとにトレードしている
-            tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +1, ps +1)
+            tradeReultNotice = r.zrangebyscore(db_key_trade + db_suffix, ps +1, ps +1)
             """
             if len(tradeReultNotice) == 0:
-                tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps +2, ps +2)
+                tradeReultNotice = r.zrangebyscore(db_key_trade + db_suffix, ps +2, ps +2)
 
             if len(tradeReultNotice) == 0:
-                tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps + 3, ps + 3)
+                tradeReultNotice = r.zrangebyscore(db_key_trade + db_suffix, ps + 3, ps + 3)
 
             if len(tradeReultNotice) == 0:
-                tradeReultNotice = r.zrangebyscore(symbol + "_TRADE", ps + 4, ps + 4)
+                tradeReultNotice = r.zrangebyscore(db_key_trade + db_suffix, ps + 4, ps + 4)
             """
             if len(tradeReultNotice) != 0:
                 notice_try_cnt = notice_try_cnt + 1
@@ -403,7 +440,10 @@ if __name__ == "__main__":
             notice_cnt += 1
 
         if max == 0 or max == 2:
+            cpu_predict_cnt = cpu_predict_cnt + 1
             res = "win" if max == y.argmax() else "lose"
+            if res == "win":
+                cpu_win_cnt = cpu_win_cnt + 1
 
             flg = False
             for k, v in spread_list.items():
@@ -422,6 +462,50 @@ if __name__ == "__main__":
                     spread_trade["spread16Over"] = spread_trade.get("spread16Over", 0) + 1
                     if result == "win":
                         spread_win["spread16Over"] = spread_win.get("spread16Over", 0) + 1
+
+            tmp_prob_cnt_list = {}
+            tmp_prob_real_cnt_list = {}
+            # 確率ごとのトレード数および勝率を求めるためのリスト
+            if percent in prob_list.keys():
+                tmp_prob_list = prob_list[percent]
+                if res == "win":
+                    tmp_prob_cnt_list["win_cnt"] = tmp_prob_list["win_cnt"] + 1
+                    tmp_prob_cnt_list["lose_cnt"] = tmp_prob_list["lose_cnt"]
+                else:
+                    tmp_prob_cnt_list["win_cnt"] = tmp_prob_list["win_cnt"]
+                    tmp_prob_cnt_list["lose_cnt"] = tmp_prob_list["lose_cnt"] + 1
+                prob_list[percent] = tmp_prob_cnt_list
+            else:
+                if res == "win":
+                    tmp_prob_cnt_list["win_cnt"] = 1
+                    tmp_prob_cnt_list["lose_cnt"] = 0
+                else:
+                    tmp_prob_cnt_list["win_cnt"] = 0
+                    tmp_prob_cnt_list["lose_cnt"] = 1
+                prob_list[percent] = tmp_prob_cnt_list
+            #トレードした場合
+            if result == "win":
+                # 確率ごとのトレード数および勝率を求めるためのリスト
+                if percent in prob_real_list.keys():
+                    tmp_prob_real_list = prob_real_list[percent]
+                    tmp_prob_real_cnt_list["win_cnt"] = tmp_prob_real_list["win_cnt"] + 1
+                    tmp_prob_real_cnt_list["lose_cnt"] = tmp_prob_real_list["lose_cnt"]
+                    prob_real_list[percent] = tmp_prob_real_cnt_list
+                else:
+                    tmp_prob_real_cnt_list["win_cnt"] = 1
+                    tmp_prob_real_cnt_list["lose_cnt"] = 0
+                    prob_real_list[percent] = tmp_prob_real_cnt_list
+            elif result == "lose":
+                if percent in prob_real_list.keys():
+                    tmp_prob_real_list = prob_real_list[percent]
+                    tmp_prob_real_cnt_list["win_cnt"] = tmp_prob_real_list["win_cnt"]
+                    tmp_prob_real_cnt_list["lose_cnt"] = tmp_prob_real_list["lose_cnt"] + 1
+                    prob_real_list[percent] = tmp_prob_real_cnt_list
+                else:
+                    tmp_prob_real_cnt_list["win_cnt"] = 0
+                    tmp_prob_real_cnt_list["lose_cnt"] = 1
+                    prob_real_list[percent] = tmp_prob_real_cnt_list
+
         if max == 0:
             # Up predict
             if fx:
@@ -614,17 +698,28 @@ if __name__ == "__main__":
 
     print("predict money: " + str(money))
 
-    tmp_acc = (up_cor_length + down_cor_length)/(len(up_ind5) + len(down_ind5))
+    tmp_acc = cpu_win_cnt/cpu_predict_cnt
     print("Accuracy over " + str(border) + ":", tmp_acc)
-    print("Total:", len(up_ind5) + len(down_ind5))
-    print("Correct:", (len(up_ind5) + len(down_ind5)) * tmp_acc)
-    print("trade cnt rate: " + str(trade_cnt/(len(up_ind5) + len(down_ind5))))
+    print("Total:", str(cpu_predict_cnt))
+    print("Correct:", str(cpu_predict_cnt * tmp_acc))
+    print("trade cnt rate: " + str(trade_cnt/cpu_predict_cnt))
 
     for k, v in sorted(spread_list.items()):
         if spread_trade.get(k, 0) != 0:
             print(k, " cnt:", spread_trade.get(k, 0), " win rate:", spread_win.get(k, 0) / spread_trade.get(k))
         else:
             print(k, " cnt:", spread_trade.get(k, 0))
+
+    for k ,v in sorted(prob_list.items()):
+        #勝率
+        win_rate = v["win_cnt"] / (v["win_cnt"] + v["lose_cnt"])
+        print("理論上の確率:" + k + " 勝ち:" + str(v["win_cnt"]) + " 負け:" + str(v["lose_cnt"]) + " 勝率:" + str(win_rate))
+    for k ,v in sorted(prob_real_list.items()):
+        #トレードできた確率
+        trade_rate = (v["win_cnt"] + v["lose_cnt"]) / (prob_list[k]["win_cnt"] + prob_list[k]["lose_cnt"])
+        #勝率
+        win_rate = v["win_cnt"] / (v["win_cnt"] + v["lose_cnt"])
+        print("実トレード上の確率:" + k + " トレードできた割合:" + str(trade_rate) + " 勝率:" + str(win_rate))
 
     #plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
     plt.show()

@@ -1,4 +1,3 @@
-from flask import Flask, request
 import numpy as np
 import keras.models
 import tensorflow as tf
@@ -10,110 +9,75 @@ import json
 from scipy.ndimage.interpolation import shift
 import logging.config
 from keras.models import load_model
-import math
+from keras import backend as K
+from matplotlib import pyplot as plt
+import seaborn as sns
+from datetime import datetime
+from datetime import timedelta
+from keras.utils.training_utils import multi_gpu_model
+import time
+from indices import index
+from decimal import Decimal
+from flask import Flask, request
+import subprocess
+import send_mail as m
+from datetime import datetime
+from datetime import date
 
-#GPU使わない方がはやい
-os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
+#nginxとflaskを使ってhttpによりAiの予想を呼び出す方式
+#systemctl start nginxでwebサーバを起動後、以下のコマンドによりuwsgiを起動し、localhost:80へアクセス
+#uwsgi --ini /app/bin_op/uwsgi.ini
+
+
+machine = "amd6"
+maxlen = 600;
+model_dir = "/app/bin_op/model"
+file_prefix = "GBPJPY_lstm_close_divide_2_m600_term_30_hid1_60_hid2_0_hid3_0_hid4_0_drop_0.0_bid_merg_2_set_ALL.hdf5.90*17"
+model_file = os.path.join(model_dir, file_prefix)
+
 app = Flask(__name__)
 
-#symbol = "EURUSD"
-symbol = "GBPJPY"
-
-db_no = 7
-
-maxlen = 100
-drop = 0.1
-in_num=1
-pred_term = 6
-s = "5"
-np.random.seed(0)
-n_hidden =  30
-n_hidden2 = 0
-n_hidden3 = 0
-n_hidden4 = 0
-border = 0.56
-askbid = "_bid"
-
-current_dir = os.path.dirname(__file__)
-ini_file = os.path.join(current_dir,"config","config.ini")
-config = configparser.ConfigParser()
-config.read(ini_file)
-MODEL_DIR = config['lstm']['MODEL_DIR']
-
-logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
-logger = logging.getLogger("app")
-
-file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid
-
-model_file = os.path.join(MODEL_DIR, file_prefix +".hdf5")
-
-"""
-model_file = os.path.join(MODEL_DIR, "bydrop_in1_" + s + "_m" + str(maxlen) + "_hid1_" + str(n_hidden)
-                          + "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) +".hdf5")
-"""
-signal = ['UP','SAME','DOWN','SHORT']
-
-# model and backend graph must be created on global
-global model, graph
 if os.path.isfile(model_file):
     model = load_model(model_file)
-    model.compile(loss='categorical_crossentropy',optimizer='rmsprop', metrics=['accuracy'])
-    #print("Load Model")
+    model.compile(loss='categorical_crossentropy', optimizer='adam', metrics=['accuracy'])
+    print("load model")
 else:
-    logger.warning("no model exists")
+    msg = "the Model not exists!"
+    print(msg)
+    m.send_message("uwsgi " + machine + " ", msg)
 
-graph = tf.get_default_graph()
 
-def get_redis_data():
-    #print("DB_NO:", db_no)
-    r = redis.Redis(host='localhost', port=6379, db=db_no)
-    result = r.zrevrange(symbol, 0  , maxlen
-                      , withscores=False)
-    if len(result) < maxlen:
-        return None
-    close_tmp= []
-    result.reverse()
-    for line in result:
-        tmps = json.loads(line.decode('utf-8'))
-        close_tmp.append(tmps.get("close"))
-    #logger.info(close_tmp)
-    """
-    close = np.ones(maxlen, dtype=np.float32)
-    c =0
-    for i in close_tmp:
-        if c!=0:
-            logger.info(close_tmp[c]/close_tmp[c-1]);
-            logger.info(math.log((close_tmp[c] / close_tmp[c - 1])))
-            close[c -1] = 10000 * math.log((close_tmp[c] / close_tmp[c - 1]))
-        c = c+1
-    """
-    close = 10000 * np.log(close_tmp/shift(close_tmp, 1, cval=np.NaN) )[1:]
+def do_predict(retX):
+    #print(retX.shape)
+    #start = time.time()
+    res = model.predict(retX, verbose=0,batch_size=1 )
 
-    dataX = np.zeros((1,maxlen, 1))
-    dataX[:, :, 0] = close[:]
-    print("X:", dataX)
+    #elapsed_time = time.time() - start
+    #print("elapsed_time:{0}".format(elapsed_time) + "[sec]")
 
-    return dataX
+    #print(res)
 
-@app.route('/', methods=['GET'])
-def root():
-    dataX = get_redis_data()
-    #data sort
-    if dataX is None:
-        return signal[3]
+    #K.clear_session()
+    return res
 
-    with graph.as_default():  # use the global graph
-        res = model.predict(dataX, verbose=0)[0]
-        #print(res)
-        pred = res.argmax()
-        prob = res[pred]
-        logger.info("predicted:" + signal[pred] + " probup:" + str(res[0])+ " probsame:" + str(res[1])+ " probdown:" + str(res[2]))
-        ret = signal[pred]
-        if prob < border:
-            ret = signal[1] # SAME
-        return ret
 
+@app.route("/", methods=['GET', 'POST'])
+def hello():
+    data = request.get_json()
+    closes = data["closes"]
+
+    #print(closes[:11])
+
+    close = 10000 * np.log(closes / shift(closes, 1, cval=np.NaN))[1:]
+    retX = np.zeros((1, maxlen, 1))
+    retX[:, :, 0] = close[:]
+    res = do_predict(retX)
+    res_str = ""
+
+    res_str = str(res[0][0]) + "," + str(res[0][1]) + "," + str(res[0][2])
+    #print(res_str)
+    return res_str
 
 if __name__ == "__main__":
-    app.run(host='0.0.0.0', port=5000)
+    app.run()
+

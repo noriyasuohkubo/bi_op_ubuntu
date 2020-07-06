@@ -5,19 +5,28 @@ from keras.utils.training_utils import multi_gpu_model
 import time
 os.environ["OMP_NUM_THREADS"] = "3"
 #定数ファイル
-host = "127.0.0.1"
+#host = "127.0.0.1"
+host = "amd1"
 
 symbol = "GBPJPY"
 symbols = [symbol]
 #symbols = [symbol + "5", symbol + "10",symbol]
 
-export_host = "noriyasu"
+export_host = "local"
+
+db_nos = {"opt":1,"snc":1,"noriyasu":11,"yoshiko":12,"local":8,"fil":14}
+
+db_no = db_nos[export_host]
+
 #取引制限ありと想定して予想させる
 #この場合、必ずしも予想時に実際のトレードがされると限らないので、トレード実績を見たい場合はFalseにする
-restrict_flg = True
+restrict_flg = False
 
 #THE OPTIONである
 the_option_flg = False
+
+#SONICである
+the_sonic_flg = False
 
 #TRB or SPR
 type = "SPR"
@@ -25,15 +34,20 @@ type = "SPR"
 #デモである
 demo = False
 
-suffix = ".70*8"
+border = 0.565
+border_up = 0.61
 
-border = 0.58
+except_list = [20,21,22]
+if(the_option_flg):
+    except_list = [21,22]
+if(the_sonic_flg):
+    except_list = [19,20,21,22]
 
-#except_list = [20,21,22]
-except_list = [21,22,23]
+border_spread = 0.005
+limit_border_flg = True
 
-border_spread = 0.008
-limit_border_flg = False
+border_payout = 2.2
+limit_payout_flg = False
 
 spread = 1
 
@@ -50,19 +64,34 @@ spread = 1
 #for gbpjpy snc
 #except_list = [3,4,6,7,8,9,10,11,13,14,15,16,17,20, 21, 22]
 
-start = datetime(2019, 9, 1, 22)
+start = datetime(2020, 4, 15, 22)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2020, 1, 1, 22 )
+end = datetime(2020, 6, 12, 22 )
 end_stp = int(time.mktime(end.timetuple()))
 
-maxlen = 400
+maxlen = 600
 pred_term = 15
 s = "2"
 
-#trb 30:1000, 60:950. 180:900, 500:850
-#spr 30:1200, 60:1100, 180:1050, 300:1000
-payout = 1000
+trb_payout = {"30":950,"60":900,"180":900,"500":850}
+spr_payout = {"30":1300,"60":1200,"180":1050,"500":1000}
+
+if(the_option_flg):
+    trb_payout = {"30": 830,}
+    spr_payout = {"30": 1000, }
+
+if(the_sonic_flg):
+    spr_payout = {"30": 1020, }
+
+db_no = db_nos[export_host]
+
+if type == "TRB":
+    payout = trb_payout[str(pred_term*int(s))]
+elif type == "SPR":
+    payout = spr_payout[str(pred_term * int(s))]
+print("payout:",payout)
+
 payoff = 1000
 
 merg = ""
@@ -70,7 +99,7 @@ merg_file = ""
 if merg != "":
     merg_file = "_merg_" + str(merg)
 
-n_hidden = 40
+n_hidden = 60
 n_hidden2 = 0
 n_hidden3 = 0
 n_hidden4 = 0
@@ -83,9 +112,8 @@ spread_list = {"spread0":(-1,0.000),"spread1":(0.000,0.001),"spread2":(0.001,0.0
     ,"spread5":(0.004,0.005),"spread6":(0.005,0.006),"spread7":(0.006,0.007),"spread8":(0.007,0.008)
     , "spread10": (0.008, 0.010), "spread12": (0.010, 0.012), "spread14": (0.012, 0.014), "spread16": (0.014, 0.016),"spread16Over":(0.016,1),}
 
-db_nos = {"opt":1,"snc":1,"noriyasu":11,"yorioko":14,"kazuo":8,"fil":14}
-
-db_no = db_nos[export_host]
+drawdown_list = {"drawdown1":(0,-10000),"drawdown2":(-10000,-20000),"drawdown3":(-20000,-30000),"drawdown4":(-30000,-40000),"drawdown5":(-40000,-50000),"drawdown6":(-50000,-60000),
+                 "drawdown7": (-60000, -70000),"drawdown8": (-70000, -80000),"drawdown9": (-80000, -90000),"drawdown9over": (-90000, -1000000),}
 
 #db_suffix_trade_list = {"ubuntu1":"","ubuntu2":"","ubuntu3":"_OPT","ubuntu4":"","ubuntu4-2":"","ubuntu5":"","ubuntu18":""}
 
@@ -98,11 +126,13 @@ if demo:
 else:
     db_suffix = ""
 
-db_key = symbol + "_" + str(int(s) * pred_term)  + "_" + type
-#db_key = symbol
+#db_key = symbol + "_" + str(int(s) * pred_term)  + "_" + type
+db_key = symbol + "_" + str(int(s) * pred_term)  + "_SPR"
 
 if(the_option_flg):
     db_key = db_key + "_OPT"
+if(the_sonic_flg):
+    db_key = db_key + "_SNC"
 
 db_key_trade = db_key + "_TRADE"
 print("db_key: " + db_key)
@@ -118,16 +148,18 @@ except_highlow = True
 #process_count = multiprocessing.cpu_count() - 1
 process_count = 1
 askbid = "_bid"
-type = "category"
 
 default_money = 0
 
 current_dir = os.path.dirname(__file__)
 
-file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen) + "_term_" + str(pred_term * int(s)) + "_hid1_" + str(n_hidden) + \
-                          "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop)  + askbid + merg_file
+file_prefix = "GBPJPY_lstm_close_divide_2_m600_term_30_hid1_60_hid2_0_hid3_0_hid4_0_drop_0.0_bid_merg_2_set_ALL.hdf5.90*17"
+#file_prefix ="GBPJPY_bydrop_in1_2_m400_term_30_hid1_40_hid2_0_hid3_0_hid4_0_drop_0.0_bid.hdf5.70*8"
 
 history_file = os.path.join(current_dir, "history", file_prefix + "_history.csv")
-model_file = os.path.join(model_dir, file_prefix + ".hdf5" + suffix)
+model_file = os.path.join(model_dir, file_prefix)
 print("Model is ", model_file)
+
+if os.path.isfile(model_file) == False:
+    print("the Model not exists!")
 

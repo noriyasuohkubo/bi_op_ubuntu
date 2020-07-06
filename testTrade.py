@@ -16,9 +16,9 @@ from datetime import datetime
 from datetime import timedelta
 from keras.utils.training_utils import multi_gpu_model
 import time
-from indices import index
+from bi_op_ubuntu.indices import index
 from decimal import Decimal
-from readConf import *
+from bi_op_ubuntu.readConf import *
 #CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
 os.environ["OMP_NUM_THREADS"] = "3"
 
@@ -33,6 +33,20 @@ logger = logging.getLogger("app")
 
 percentUP_cnt ={}
 
+def countDrawdoan(max_drawdowns, max_drawdown, drawdown, money):
+    drawdown = drawdown + money
+    if max_drawdown > drawdown:
+        #最大ドローダウンを更新してしまった場合
+        max_drawdown = drawdown
+
+    if drawdown > 0:
+        if max_drawdown != 0:
+            max_drawdowns.append(max_drawdown)
+        drawdown = 0
+        max_drawdown = 0
+
+    return max_drawdown, drawdown
+
 def get_redis_data():
     print("DB_NO:", db_no)
     r = redis.Redis(host= host, port=6379, db=db_no, decode_responses=True)
@@ -43,6 +57,7 @@ def get_redis_data():
     score_tmp = []
     spread_tmp = []
     payout_tmp = {}
+    pay_tmp = []
 
     print(result[0:5])
     print(result[-5:])
@@ -68,16 +83,21 @@ def get_redis_data():
         if tmps.get("spread") == None:
             spread_tmp.append(0.0)
         else:
-            #0.3などの形で入っているので実際の値にするため1/100にする
             if(the_option_flg):
                 spread_tmp.append(float(tmps.get("spread")))
+            elif (the_sonic_flg):
+                spread_tmp.append(float(tmps.get("spread")))
             else:
-                spread_tmp.append(float(tmps.get("spread")) / 100)
+                # 0.3などの形で入っているので実際の値にするため1/100にする
+                spread_tmp.append(float(Decimal(tmps.get("spread")) / Decimal("100")))
 
         if tmps.get("payout") == None:
             pay = 0.000
         else:
             pay = tmps.get("payout")
+
+        if limit_payout_flg:
+            pay_tmp.append(pay)
 
         if pay in payout_tmp.keys():
             payout_tmp[pay] = payout_tmp[pay] + 1
@@ -86,6 +106,7 @@ def get_redis_data():
 
         if close_t == 0.0:
             print("close:0 " + str(score))
+            # close が0の場合 ZREMRANGEBYSCOREでそのレコードを削除する
         #high_tmp.append(tmps.get("high"))
         #low_tmp.append(tmps.get("low"))
     #Payoutの種類確認
@@ -143,7 +164,12 @@ def get_redis_data():
         spr = spread_tmp[1 + i + maxlen - 1]
         # 指定スプレッド以上のトレードは無視する
         if limit_border_flg:
-            if spr <= border_spread:
+            if spr > border_spread:
+                continue
+
+        # 指定payout underのトレードは無視する
+        if limit_payout_flg:
+            if pay_tmp[1 + i + maxlen - 1] < border_payout:
                 continue
 
         close_data.append(close[i:(i + maxlen)])
@@ -178,7 +204,7 @@ def get_redis_data():
         #取引開始時のスプレッド
         spr_trade = spread
         if(type == "SPR"):
-            spr_trade = (spr * 1000) + spread
+            spr_trade = int(Decimal(str(spr)) * Decimal("1000")) + spread
         #if(tmp_count == 1):
         #    print("spread_trade", spr_trade)
         #正解をいれる
@@ -261,10 +287,14 @@ def do_predict(test_X, test_Y):
 if __name__ == "__main__":
     spread_trade = {}
     spread_win = {}
+
+    spread_trade_real = {}
+    spread_win_real = {}
+
     dataX, dataY, price_data, time_data, close, time, predict_time, predict_score, end_price, spread_data, spread_tmp = get_redis_data()
     res = do_predict(dataX,dataY)
 
-    ind5 = np.where(res >=border)[0]
+    ind5 = np.where((res >=border) & (res <=border_up))[0]
     x5 = res[ind5,:]
     y5= dataY[ind5,:]
     p5 = price_data[ind5]
@@ -287,8 +317,11 @@ if __name__ == "__main__":
 
     up = res[:, 0]
     down = res[:, 2]
-    up_ind5 = np.where(up >= border)[0]
-    down_ind5 = np.where(down >= border)[0]
+    #up_ind5 = np.where(up >= border)[0]
+    #down_ind5 = np.where(down >= border)[0]
+
+    up_ind5 = np.where((up >= border) & (up <= border_up))[0]
+    down_ind5 = np.where((down >= border) & (down <= border_up))[0]
 
     x5_up = res[up_ind5,:]
     y5_up= dataY[up_ind5,:]
@@ -369,6 +402,11 @@ if __name__ == "__main__":
     tmp_cnt = 0
     cpu_predict_cnt = 0
     cpu_win_cnt = 0
+
+    max_drawdown = 0
+    drawdown = 0
+    max_drawdowns = []
+
     for x,y,p,t,pt,ps,ep,sp in zip(x5,y5,p5,t5, pt5, ps5, ep5, sp5):
 
         max = x.argmax()
@@ -427,7 +465,7 @@ if __name__ == "__main__":
                 notice_try_cnt = notice_try_cnt + 1
                 tmps = json.loads(tradeReultNotice[0].decode('utf-8'))
                 #startVal = tmps.get("startVal")
-                #endVal = tmps.get("endVal")
+                #endVal = e3tmps.get("endVal")
                 resultNotice = tmps.get("result")
                 if resultNotice == "win":
                     notice_try_win_cnt = notice_try_win_cnt + 1
@@ -440,11 +478,13 @@ if __name__ == "__main__":
             notice_cnt += 1
 
         if max == 0 or max == 2:
+
             cpu_predict_cnt = cpu_predict_cnt + 1
             res = "win" if max == y.argmax() else "lose"
             if res == "win":
                 cpu_win_cnt = cpu_win_cnt + 1
 
+            # 理論上のスプレッド毎の勝率
             flg = False
             for k, v in spread_list.items():
                 if sp > v[0] and sp <= v[1]:
@@ -456,12 +496,32 @@ if __name__ == "__main__":
             if flg == False:
                 if sp < 0:
                     spread_trade["spread0"] = spread_trade.get("spread0", 0) + 1
-                    if result == "win":
+                    if res == "win":
                         spread_win["spread0"] = spread_win.get("spread0", 0) + 1
                 else:
                     spread_trade["spread16Over"] = spread_trade.get("spread16Over", 0) + 1
-                    if result == "win":
+                    if res == "win":
                         spread_win["spread16Over"] = spread_win.get("spread16Over", 0) + 1
+
+            # 実際のスプレッド毎の勝率
+            if len(tradeReult) != 0:
+                flg = False
+                for k, v in spread_list.items():
+                    if sp > v[0] and sp <= v[1]:
+                        spread_trade_real[k] = spread_trade_real.get(k, 0) + 1
+                        if result == "win":
+                            spread_win_real[k] = spread_win_real.get(k, 0) + 1
+                        flg = True
+                        break
+                if flg == False:
+                    if sp < 0:
+                        spread_trade_real["spread0"] = spread_trade_real.get("spread0", 0) + 1
+                        if result == "win":
+                            spread_win_real["spread0"] = spread_win_real.get("spread0", 0) + 1
+                    else:
+                        spread_trade_real["spread16Over"] = spread_trade_real.get("spread16Over", 0) + 1
+                        if result == "win":
+                            spread_win_real["spread16Over"] = spread_win_real.get("spread16Over", 0) + 1
 
             tmp_prob_cnt_list = {}
             tmp_prob_real_cnt_list = {}
@@ -514,10 +574,11 @@ if __name__ == "__main__":
                 # DB上の値は実際の1／100なので100倍している
                 profit = float(Decimal(str(sell)) - Decimal(str(buy)) - Decimal(str((0.00001 * fx_spread * fx_position)))) * 100
                 money = money + profit
+                max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, profit)
             if max == y.argmax():
                 if fx == False:
                     money = money + payout
-
+                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice + payout
                         not_notice_win_cnt = not_notice_win_cnt + 1
@@ -538,6 +599,7 @@ if __name__ == "__main__":
             else :
                 if fx == False:
                     money = money - payoff
+                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice - payoff
                 wrong_list_up_x[cnt_up_wrong] = pt
@@ -561,9 +623,11 @@ if __name__ == "__main__":
                 buy =  ep * fx_position
                 profit = float(Decimal(str(sell)) - Decimal(str(buy)) - Decimal(str((0.00001 * fx_spread * fx_position)))) * 100
                 money = money + profit
+                max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, profit)
             if max == y.argmax():
                 if fx == False:
                     money = money + payout
+                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice + payout
                         not_notice_win_cnt = not_notice_win_cnt + 1
@@ -587,6 +651,7 @@ if __name__ == "__main__":
             else:
                 if fx == False:
                     money = money - payoff
+                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice - payoff
                 wrong_list_down_x[cnt_down_wrong] = pt
@@ -678,23 +743,24 @@ if __name__ == "__main__":
 
     #print('\n'.join(result_txt))
 
-    print("trade cnt: " + str(trade_cnt))
-    print("trade correct: " + str(true_cnt / trade_cnt))
-    print("trade wrong cnt: " + str(trade_cnt - true_cnt))
-    print("trade wrong win cnt: " + str(trade_wrong_win_cnt))
-    print("trade wrong lose cnt: " + str(trade_wrong_lose_cnt))
+    if trade_cnt != 0:
+        print("trade cnt: " + str(trade_cnt))
+        print("trade correct: " + str(true_cnt / trade_cnt))
+        print("trade wrong cnt: " + str(trade_cnt - true_cnt))
+        print("trade wrong win cnt: " + str(trade_wrong_win_cnt))
+        print("trade wrong lose cnt: " + str(trade_wrong_lose_cnt))
 
-    print("not_trade cnt: " + str(not_trade_cnt))
-    print("notice cnt: " + str(notice_cnt))
-    print("not_notice accuracy: " + str(not_notice_win_cnt / trade_cnt))
-    print("not_notice money: " + str(prev_not_notice_money))
+        print("not_trade cnt: " + str(not_trade_cnt))
+        print("notice cnt: " + str(notice_cnt))
+        print("not_notice accuracy: " + str(not_notice_win_cnt / trade_cnt))
+        print("not_notice money: " + str(prev_not_notice_money))
 
-    print("notice_try accuracy: " + str((trade_win_cnt + notice_try_win_cnt) / (trade_cnt + notice_try_cnt)))
-    print("notice_try money: " + str(prev_notice_try_money))
-    print("notice_try_cnt: " + str(notice_try_cnt))
+        print("notice_try accuracy: " + str((trade_win_cnt + notice_try_win_cnt) / (trade_cnt + notice_try_cnt)))
+        print("notice_try money: " + str(prev_notice_try_money))
+        print("notice_try_cnt: " + str(notice_try_cnt))
 
-    print("trade accuracy: " + str(trade_win_cnt/trade_cnt))
-    print("trade money: " + str(prev_trade_money))
+        print("trade accuracy: " + str(trade_win_cnt/trade_cnt))
+        print("trade money: " + str(prev_trade_money))
 
     print("predict money: " + str(money))
 
@@ -704,11 +770,38 @@ if __name__ == "__main__":
     print("Correct:", str(cpu_predict_cnt * tmp_acc))
     print("trade cnt rate: " + str(trade_cnt/cpu_predict_cnt))
 
+    print("理論上のスプレッド毎の勝率")
     for k, v in sorted(spread_list.items()):
         if spread_trade.get(k, 0) != 0:
             print(k, " cnt:", spread_trade.get(k, 0), " win rate:", spread_win.get(k, 0) / spread_trade.get(k))
         else:
             print(k, " cnt:", spread_trade.get(k, 0))
+    print("実トレード上のスプレッド毎の勝率")
+    for k, v in sorted(spread_list.items()):
+        if spread_trade_real.get(k, 0) != 0:
+            print(k, " cnt:", spread_trade_real.get(k, 0), " win rate:", spread_win_real.get(k, 0) / spread_trade_real.get(k))
+        else:
+            print(k, " cnt:", spread_trade_real.get(k, 0))
+
+    print("スプレッド毎の約定率")
+    for k, v in sorted(spread_list.items()):
+        if spread_trade_real.get(k, 0) != 0:
+            print(k, " cnt:", spread_trade_real.get(k, 0), " rate:", spread_trade_real.get(k) / spread_trade.get(k))
+
+
+    #draw-down
+    max_drawdowns.sort()
+    print("MAX DrawDowns")
+    print(max_drawdowns[0:10])
+
+    drawdown_cnt = {}
+    for i in max_drawdowns:
+        for k, v in drawdown_list.items():
+            if i < v[0] and i >= v[1]:
+                drawdown_cnt[k] = drawdown_cnt.get(k,0) + 1
+                break
+    for k, v in sorted(drawdown_list.items()):
+        print(k, drawdown_cnt.get(k,0))
 
     for k ,v in sorted(prob_list.items()):
         #勝率
@@ -720,6 +813,7 @@ if __name__ == "__main__":
         #勝率
         win_rate = v["win_cnt"] / (v["win_cnt"] + v["lose_cnt"])
         print("実トレード上の確率:" + k + " トレードできた割合:" + str(trade_rate) + " 勝率:" + str(win_rate))
+
 
     #plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
     plt.show()

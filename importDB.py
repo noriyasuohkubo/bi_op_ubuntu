@@ -8,16 +8,17 @@ symbol = "GBPJPY"
 
 #symbols = (symbol+"2", symbol+"5") #hybrid用
 symbol_list = {"opt": (symbol + "_30_SPR_OPT",),
+               "snc": (symbol + "_30_SPR_SNC",),
                "fil": (symbol + "_30_TRB",),
-               "noriyasu": (symbol + "_30_TRB",symbol + "_30_SPR",symbol + "_60_TRB",symbol + "_60_SPR",),
+               "noriyasu": (symbol + "_30_TRB",symbol + "_30_SPR",symbol + "_60_SPR",),
                "ig": (symbol + "_2_IG",),
                }
 
-import_db_nos = {"opt":1,"snc":1,"noriyasu":11,"yorioko":14,"fil":14,"ig":6}
+import_db_nos = {"opt":8,"snc":8,"noriyasu":8,"yorioko":14,"fil":14,"ig":6}
 export_db_no = 8
 
-import_db = "ig"
-export_host = "127.0.0.1"
+import_db = "snc"
+export_host = "amd3"
 import_host = "127.0.0.1"
 
 demo_flg = False
@@ -26,10 +27,10 @@ if demo_flg:
     db_post_fix = "_DEMO"
 
 
-start = datetime(2019, 11, 1)
+start = datetime(2020, 2, 2)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2020, 2, 10)
+end = datetime(2020, 6, 2)
 end_stp = int(time.mktime(end.timetuple()))
 
 def import_data():

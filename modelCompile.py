@@ -56,7 +56,7 @@ file_prefix = symbol + "_bydrop_in" + str(in_num) + "_" + s + "_m" + str(maxlen)
                           "_hid2_" + str(n_hidden2) + "_hid3_" + str(n_hidden3) + "_hid4_" + str(n_hidden4) + "_drop_" + str(drop) + askbid + bin_type
                           
 """
-model_file_name = "GBPJPY_lstmdrop_in1_2_m600_term_30_hid1_60_hid2_0_hid3_0_hid4_0_drop_0.0_bid.hdf5.90*7"
+model_file_name = "GBPJPY_lstm_close_divide_2_m600_term_30_hid1_60_hid2_0_hid3_0_hid4_0_drop_0.0_bid_merg_2_set_ALL.hdf5.90*17"
 model_file = os.path.join(MODEL_DIR, model_file_name)
 
 # model and backend graph must be created on global

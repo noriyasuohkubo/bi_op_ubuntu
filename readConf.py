@@ -5,8 +5,8 @@ from keras.utils.training_utils import multi_gpu_model
 import time
 os.environ["OMP_NUM_THREADS"] = "3"
 #定数ファイル
-#host = "127.0.0.1"
-host = "amd1"
+host = "127.0.0.1"
+#host = "amd1"
 
 symbol = "GBPJPY"
 symbols = [symbol]
@@ -34,8 +34,33 @@ type = "SPR"
 #デモである
 demo = False
 
-border = 0.565
-border_up = 0.61
+#oandaのレートでトレードする場合
+oanda_flg = False
+
+#spreadPrevの値で計算する場合
+spread_prev_flg = False
+spread_key = "spread"
+if spread_prev_flg:
+    spread_key = "spreadPrev"
+
+#2秒ごとの成績を計算する場合
+per_sec_flg = True
+#2秒ごとの成績を秒をキーとしてトレード回数と勝利数を保持
+#{key:[trade_num,win_num]}
+per_sec_dict = {}
+per_sec_dict_real = {}
+if per_sec_flg:
+    for i in range(60):
+        if i % 2 == 0:
+            per_sec_dict[i] = [0,0]
+            per_sec_dict_real[i] = [0, 0]
+
+#除外するトレード秒を指定
+except_sec_list = [24,26,28]
+#except_sec_list = []
+
+border = 0.54
+border_up = 0.99
 
 except_list = [20,21,22]
 if(the_option_flg):
@@ -43,7 +68,8 @@ if(the_option_flg):
 if(the_sonic_flg):
     except_list = [19,20,21,22]
 
-border_spread = 0.005
+#高すぎるスプレッドを除外するか
+border_spread = 0.008
 limit_border_flg = True
 
 border_payout = 2.2
@@ -64,10 +90,10 @@ spread = 1
 #for gbpjpy snc
 #except_list = [3,4,6,7,8,9,10,11,13,14,15,16,17,20, 21, 22]
 
-start = datetime(2020, 4, 15, 22)
+start = datetime(2020, 4, 16, 23)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2020, 6, 12, 22 )
+end = datetime(2020, 9, 18, 22 )
 end_stp = int(time.mktime(end.timetuple()))
 
 maxlen = 600
@@ -139,7 +165,7 @@ print("db_key: " + db_key)
 
 
 model_dir = "/app/bin_op/model"
-gpu_count = 1
+gpu_count = 2
 batch_size = 2048* gpu_count
 
 except_index = False
@@ -163,3 +189,58 @@ print("Model is ", model_file)
 if os.path.isfile(model_file) == False:
     print("the Model not exists!")
 
+#トレード失敗した日を除外するか
+except_fail_flg = False
+
+#amd1でトレードエラーとなった日のリスト
+#after 2020/04/17
+amd1_fail_list = [
+"2020/04/26",
+"2020/04/29",
+"2020/05/10",
+"2020/05/24",
+"2020/06/22",
+"2020/07/02",
+"2020/08/12",
+]
+
+#amd3でトレードエラーとなった日のリスト
+amd3_fail_list = [
+"2020/05/07",
+"2020/05/10",
+"2020/05/11",
+"2020/05/24",
+"2020/06/22",
+"2020/07/02",
+"2020/08/12",
+"2020/08/13",
+"2020/08/16",
+]
+
+#amd1,3でトレードエラーとなった日のリスト merge
+fail_list = [
+"2020/04/26",
+"2020/04/29",
+"2020/05/07",
+"2020/05/10",
+"2020/05/11",
+"2020/05/24",
+"2020/06/22",
+"2020/07/02",
+"2020/08/12",
+"2020/08/13",
+"2020/08/16",
+]
+
+fail_list_score=[]
+#除外する日の開始スコアと終了スコアを追加していく
+if len(fail_list) !=0 :
+    for j in fail_list:
+        tmp_str = j.split("/")
+        tmp_date_start = datetime(int(tmp_str[0]), int(tmp_str[1]), int(tmp_str[2]), 23 )
+        tmp_date_end = tmp_date_start + timedelta(hours=21)
+        fail_list_score.append([int(time.mktime(tmp_date_start.timetuple())), int(time.mktime(tmp_date_end.timetuple())) ])
+"""
+for k in amd_fail_list_score:
+    print(k[0], k[1])
+"""

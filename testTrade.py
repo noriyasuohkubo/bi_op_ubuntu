@@ -73,23 +73,28 @@ def get_redis_data():
         body = line[0]
         score = line[1]
         tmps = json.loads(body)
-        close_t = tmps.get("close")
 
-        close_tmp.append(tmps.get("close"))
+        if oanda_flg:
+            close_t = tmps.get("oandaMid")
+            close_tmp.append(tmps.get("oandaMid"))
+        else:
+            close_t = tmps.get("close")
+            close_tmp.append(tmps.get("close"))
+
         time_tmp.append(tmps.get("time"))
 
         score_tmp.append(score)
         #print("spread",tmps.get("spread"))
-        if tmps.get("spread") == None:
+        if tmps.get(spread_key) == None:
             spread_tmp.append(0.0)
         else:
             if(the_option_flg):
-                spread_tmp.append(float(tmps.get("spread")))
+                spread_tmp.append(float(tmps.get(spread_key)))
             elif (the_sonic_flg):
-                spread_tmp.append(float(tmps.get("spread")))
+                spread_tmp.append(float(tmps.get(spread_key)))
             else:
                 # 0.3などの形で入っているので実際の値にするため1/100にする
-                spread_tmp.append(float(Decimal(tmps.get("spread")) / Decimal("100")))
+                spread_tmp.append(float(Decimal(tmps.get(spread_key)) / Decimal("100")))
 
         if tmps.get("payout") == None:
             pay = 0.000
@@ -164,12 +169,34 @@ def get_redis_data():
         spr = spread_tmp[1 + i + maxlen - 1]
         # 指定スプレッド以上のトレードは無視する
         if limit_border_flg:
-            if spr > border_spread:
+            if not (spr <= border_spread):
                 continue
 
         # 指定payout underのトレードは無視する
         if limit_payout_flg:
             if pay_tmp[1 + i + maxlen - 1] < border_payout:
+                continue
+
+        # 指定した秒のトレードは無視する
+        if len(except_sec_list) != 0:
+            target_date = time_tmp[1 + i + maxlen]
+            target_sec = datetime.strptime(target_date, '%Y-%m-%d %H:%M:%S').second
+            con_flg = False
+            for sec_val in except_sec_list:
+                if target_sec == sec_val:
+                    con_flg = True
+                    break
+            if con_flg:
+                continue
+
+        #except_fail_list
+        if except_fail_flg:
+            fail_flg = False
+            for fail_day in fail_list_score:
+                if fail_day[0] <= score_tmp[1 + i] and score_tmp[1 + i] <= fail_day[1]:
+                    fail_flg = True
+                    break
+            if fail_flg:
                 continue
 
         close_data.append(close[i:(i + maxlen)])
@@ -493,6 +520,7 @@ if __name__ == "__main__":
                         spread_win[k] = spread_win.get(k, 0) + 1
                     flg = True
                     break
+
             if flg == False:
                 if sp < 0:
                     spread_trade["spread0"] = spread_trade.get("spread0", 0) + 1
@@ -522,6 +550,18 @@ if __name__ == "__main__":
                         spread_trade_real["spread16Over"] = spread_trade_real.get("spread16Over", 0) + 1
                         if result == "win":
                             spread_win_real["spread16Over"] = spread_win_real.get("spread16Over", 0) + 1
+
+            # 理論上の秒毎の勝率
+            if per_sec_flg:
+                per_sec_dict[predict_t.second][0] += 1
+                if res == "win":
+                    per_sec_dict[predict_t.second][1] += 1
+
+            # 実際の秒毎の勝率
+                if len(tradeReult) != 0:
+                    per_sec_dict_real[predict_t.second][0] += 1
+                    if result == "win":
+                        per_sec_dict_real[predict_t.second][1] += 1
 
             tmp_prob_cnt_list = {}
             tmp_prob_real_cnt_list = {}
@@ -578,10 +618,10 @@ if __name__ == "__main__":
             if max == y.argmax():
                 if fx == False:
                     money = money + payout
-                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice + payout
                         not_notice_win_cnt = not_notice_win_cnt + 1
+                        max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
                 cor_list_up_x[cnt_up_cor] = pt
                 cor_list_up_y[cnt_up_cor] = p
                 cnt_up_cor = cnt_up_cor + 1
@@ -599,9 +639,9 @@ if __name__ == "__main__":
             else :
                 if fx == False:
                     money = money - payoff
-                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice - payoff
+                        max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                 wrong_list_up_x[cnt_up_wrong] = pt
                 wrong_list_up_y[cnt_up_wrong] = p
                 cnt_up_wrong = cnt_up_wrong + 1
@@ -627,10 +667,10 @@ if __name__ == "__main__":
             if max == y.argmax():
                 if fx == False:
                     money = money + payout
-                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice + payout
                         not_notice_win_cnt = not_notice_win_cnt + 1
+                        max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payout)
 
                 cor_list_down_x[cnt_down_cor] = pt
                 cor_list_down_y[cnt_down_cor] = p
@@ -651,9 +691,9 @@ if __name__ == "__main__":
             else:
                 if fx == False:
                     money = money - payoff
-                    max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                     if len(tradeReult) != 0:
                         money_not_notice = money_not_notice - payoff
+                        max_drawdown, drawdown = countDrawdoan(max_drawdowns, max_drawdown, drawdown, payoff * -1)
                 wrong_list_down_x[cnt_down_wrong] = pt
                 wrong_list_down_y[cnt_down_wrong] = p
                 cnt_down_wrong = cnt_down_wrong + 1
@@ -791,7 +831,7 @@ if __name__ == "__main__":
 
     #draw-down
     max_drawdowns.sort()
-    print("MAX DrawDowns")
+    print("MAX DrawDowns(実トレードのドローダウン)")
     print(max_drawdowns[0:10])
 
     drawdown_cnt = {}
@@ -814,6 +854,17 @@ if __name__ == "__main__":
         win_rate = v["win_cnt"] / (v["win_cnt"] + v["lose_cnt"])
         print("実トレード上の確率:" + k + " トレードできた割合:" + str(trade_rate) + " 勝率:" + str(win_rate))
 
+    if per_sec_flg:
+        # 理論上の秒ごとの勝率
+        for i in per_sec_dict.keys():
+            if per_sec_dict[i][0] != 0:
+                win_rate = per_sec_dict[i][1] / per_sec_dict[i][0]
+                print("理論上の秒毎の確率:" + str(i) + " トレード数:" + str(per_sec_dict[i][0]) + " 勝率:" + str(win_rate))
+        # 実際の秒ごとの勝率
+        for i in per_sec_dict_real.keys():
+            if per_sec_dict_real[i][0] != 0:
+                win_rate = per_sec_dict_real[i][1] / per_sec_dict_real[i][0]
+                print("実際の秒毎の確率:" + str(i) + " トレード数:" + str(per_sec_dict_real[i][0]) + " 勝率:" + str(win_rate))
 
     #plt.title('border:' + str(border) + " payout:" + str(payout) + " except index:" + str(except_index))
     plt.show()

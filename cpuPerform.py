@@ -1,0 +1,119 @@
+import numpy as np
+import keras.models
+import tensorflow as tf
+import configparser
+import os
+import redis
+import traceback
+import json
+from scipy.ndimage.interpolation import shift
+import logging.config
+from keras.models import load_model
+from keras import backend as K
+from matplotlib import pyplot as plt
+import seaborn as sns
+from datetime import datetime
+from datetime import timedelta
+from keras.utils.training_utils import multi_gpu_model
+import time
+from bi_op_ubuntu.indices import index
+from decimal import Decimal
+from bi_op_ubuntu.readConf import *
+
+##DBに残した各種処理時間の統計を計算する
+
+
+#CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
+os.environ["OMP_NUM_THREADS"] = "3"
+
+current_dir = os.path.dirname(__file__)
+
+logging.config.fileConfig( os.path.join(current_dir,"config","logging.conf"))
+logger = logging.getLogger("app")
+
+if __name__ == "__main__":
+
+    #start day of measure the cpu perform
+    first_time = 0
+    last_time = 0
+    r = redis.Redis(host= host, port=6379, db=db_no, decode_responses=True)
+    result = r.zrangebyscore(db_key + db_suffix, start_stp, end_stp, withscores=True)
+
+    betTake_tmp, spreadTake_tmp, closeTake_tmp, predictTake_tmp = [], [], [], []
+    betTake_num,spreadTake_num,closeTake_num,predictTake_num = 0, 0, 0 ,0
+
+    for line in result:
+        body = line[0]
+        score = line[1]
+        tmps = json.loads(body)
+
+        bet_tmp = 0
+        if tmps.get("betTake") != None:
+            bet_tmp = tmps.get("betTake")
+            if first_time == 0:
+                first_time = tmps.get("time")
+        betTake_tmp.append(bet_tmp)
+        if bet_tmp !=0:
+            betTake_num = betTake_num +1
+
+        spread_tmp = 0
+        if tmps.get("spreadTake") != None:
+            spread_tmp = tmps.get("spreadTake")
+        spreadTake_tmp.append(spread_tmp)
+        if spread_tmp !=0:
+            spreadTake_num = spreadTake_num +1
+
+        close_tmp = 0
+        if tmps.get("closeTake") != None:
+            close_tmp = tmps.get("closeTake")
+        closeTake_tmp.append(close_tmp)
+        if close_tmp != 0:
+            closeTake_num = closeTake_num + 1
+
+        predict_tmp = 0
+        if tmps.get("predictTake") != None:
+            predict_tmp = tmps.get("predictTake")
+        predictTake_tmp.append(predict_tmp)
+        if predict_tmp != 0:
+            predictTake_num = predictTake_num + 1
+
+        last_time = tmps.get("time")
+
+    betTake_np = np.array(betTake_tmp)
+    spreadTake_np = np.array(spreadTake_tmp)
+    closeTake_np = np.array(closeTake_tmp)
+    predictTake_np = np.array(predictTake_tmp)
+
+    print("measure start day:", first_time)
+    print("measure end day:", last_time)
+
+    print("betTake Avg:", betTake_np.sum() / betTake_num if betTake_num !=0 else 0," Num:", betTake_num,)
+    print("spreadTake Avg:", spreadTake_np.sum() / spreadTake_num if spreadTake_num !=0 else 0, " Num:", spreadTake_num )
+    print("closeTake Avg:", closeTake_np.sum() / closeTake_num if closeTake_num !=0 else 0, " Num:", closeTake_num )
+    print("predictTame Avg:", predictTake_np.sum() / predictTake_num if predictTake_num !=0 else 0, " Num:", predictTake_num, )
+
+    # ヒストグラムを出力
+    # グラフ作成の参考:
+    # https://pythondatascience.plavox.info/matplotlib/%E3%83%92%E3%82%B9%E3%83%88%E3%82%B0%E3%83%A9%E3%83%A0
+
+    """
+    fig = plt.figure()
+
+    ax1 = fig.add_subplot(2, 2, 1)
+    ax1.set_title("betTakes")
+    ax1.hist(betTake_np,range=(10,100)) #rangeの下限を0にすると0の数が多すぎて平均の値付近の数がグラフで分からないため10に設定
+
+    ax2 = fig.add_subplot(2, 2, 2)
+    ax2.set_title("spreadTakes")
+    ax2.hist(spreadTake_np,range=(1,50))
+
+    ax3 = fig.add_subplot(2, 2, 3)
+    ax3.set_title("closeTakes")
+    ax3.hist(closeTake_np,range=(1,50))
+
+    ax4 = fig.add_subplot(2, 2, 4)
+    ax4.set_title("predictTakes")
+    ax4.hist(predictTake_np,range=(1,50))
+
+    plt.show()
+    """

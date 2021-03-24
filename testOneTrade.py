@@ -1,5 +1,4 @@
 import numpy as np
-import keras.models
 import tensorflow as tf
 import configparser
 import os
@@ -21,6 +20,9 @@ from decimal import Decimal
 from readConf import *
 #CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
 os.environ["OMP_NUM_THREADS"] = "3"
+
+#ubuntuではGPU使わない
+os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
 fx = False
 fx_position = 10000

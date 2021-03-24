@@ -1,12 +1,12 @@
 import os
 from datetime import datetime
 from datetime import timedelta
-from keras.utils.training_utils import multi_gpu_model
+#from keras.utils.training_utils import multi_gpu_model
 import time
 os.environ["OMP_NUM_THREADS"] = "3"
 #定数ファイル
-host = "127.0.0.1"
-#host = "amd1"
+#host = "127.0.0.1"
+host = "amd3"
 
 symbol = "GBPJPY"
 symbols = [symbol]
@@ -21,6 +21,7 @@ db_no = db_nos[export_host]
 #取引制限ありと想定して予想させる
 #この場合、必ずしも予想時に実際のトレードがされると限らないので、トレード実績を見たい場合はFalseにする
 restrict_flg = False
+restrict_term = 30
 
 #THE OPTIONである
 the_option_flg = False
@@ -56,10 +57,10 @@ if per_sec_flg:
             per_sec_dict_real[i] = [0, 0]
 
 #除外するトレード秒を指定
-except_sec_list = [24,26,28]
+except_sec_list = [24,26,28,32]
 #except_sec_list = []
 
-border = 0.54
+border = 0.565
 border_up = 0.99
 
 except_list = [20,21,22]
@@ -68,8 +69,9 @@ if(the_option_flg):
 if(the_sonic_flg):
     except_list = [19,20,21,22]
 
-#高すぎるスプレッドを除外するか
-border_spread = 0.008
+#スプレッドを除外するか
+border_spread = [0.002,0.003,0.004,0.005]
+#border_spread = [0.003,]
 limit_border_flg = True
 
 border_payout = 2.2
@@ -90,10 +92,10 @@ spread = 1
 #for gbpjpy snc
 #except_list = [3,4,6,7,8,9,10,11,13,14,15,16,17,20, 21, 22]
 
-start = datetime(2020, 4, 16, 23)
+start = datetime(2020, 9, 1,23)
 start_stp = int(time.mktime(start.timetuple()))
 
-end = datetime(2020, 9, 18, 22 )
+end = datetime(2020, 12, 30, 22 )
 end_stp = int(time.mktime(end.timetuple()))
 
 maxlen = 600

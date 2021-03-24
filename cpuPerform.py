@@ -1,27 +1,16 @@
 import numpy as np
-import keras.models
-import tensorflow as tf
-import configparser
 import os
 import redis
 import traceback
 import json
 from scipy.ndimage.interpolation import shift
 import logging.config
-from keras.models import load_model
-from keras import backend as K
-from matplotlib import pyplot as plt
-import seaborn as sns
-from datetime import datetime
-from datetime import timedelta
-from keras.utils.training_utils import multi_gpu_model
 import time
-from bi_op_ubuntu.indices import index
+from indices import index
 from decimal import Decimal
 from bi_op_ubuntu.readConf import *
 
 ##DBに残した各種処理時間の統計を計算する
-
 
 #CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
 os.environ["OMP_NUM_THREADS"] = "3"
@@ -91,6 +80,11 @@ if __name__ == "__main__":
     print("spreadTake Avg:", spreadTake_np.sum() / spreadTake_num if spreadTake_num !=0 else 0, " Num:", spreadTake_num )
     print("closeTake Avg:", closeTake_np.sum() / closeTake_num if closeTake_num !=0 else 0, " Num:", closeTake_num )
     print("predictTame Avg:", predictTake_np.sum() / predictTake_num if predictTake_num !=0 else 0, " Num:", predictTake_num, )
+
+    print("betTake MAX:", np.max(betTake_np))
+    print("spreadTake MAX:", np.max(spreadTake_np))
+    print("closeTake MAX:", np.max(closeTake_np))
+    print("predictTame MAX:", np.max(predictTake_np))
 
     # ヒストグラムを出力
     # グラフ作成の参考:

@@ -1,23 +1,18 @@
 import numpy as np
-import tensorflow.keras.models
-import configparser
-import os
 import redis
-import traceback
 import json
 from scipy.ndimage.interpolation import shift
 import logging.config
-from keras.models import load_model
-from keras import backend as K
+#from tensorflow.keras.models import load_model
+import tensorflow as tf
+from tensorflow.keras import backend as K
 from matplotlib import pyplot as plt
 
 from bi_op_ubuntu.indices import index
 from decimal import Decimal
 from bi_op_ubuntu.readConf import *
 
-#import tensorflow as tf
-import tensorflow.compat.v1 as tf
-tf.disable_v2_behavior()
+print("OK")
 
 #CPUのスレッド数を制限してロードアベレージの上昇によるハングアップを防ぐ
 os.environ["OMP_NUM_THREADS"] = "3"
@@ -291,7 +286,8 @@ def get_redis_data():
 def get_model():
 
     if os.path.isfile(model_file):
-        model = load_model(model_file)
+        #model = load_model(model_file)
+        model = tf.keras.models.load_model(model_file)
         #model_gpu = multi_gpu_model(model, gpus=gpu_count)
         model.compile(loss='categorical_crossentropy',optimizer='adam', metrics=['accuracy'])
         print("Load Model")
@@ -456,8 +452,8 @@ if __name__ == "__main__":
         if restrict_flg:
             if prev_predict_t != "":
                 interval = predict_t - prev_predict_t
-                #30秒以上あける
-                if interval.seconds < restrict_term:
+                #10秒以上あける
+                if interval.seconds < ((pred_term * int(s)) + 10):
                     continue
 
             prev_predict_t = predict_t
